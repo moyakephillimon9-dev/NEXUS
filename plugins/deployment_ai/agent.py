@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Deployment AI — Enterprise Release Engineering Engine
 
 Module ID : DEPLOY-001

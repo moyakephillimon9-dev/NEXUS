@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
+  <style>
+    .login-visual {
+      text-align: center; margin-bottom: 32px;
+    }
+    .login-glow {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #00d4ff, #0055ff);
+      border-radius: 20px; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 0 40px rgba(0,212,255,0.45), 0 0 80px rgba(0,100,255,0.2);
+      animation: glow-pulse 3s infinite;
+    }
+    @keyframes glow-pulse {
+      0%,100% { box-shadow: 0 0 40px rgba(0,212,255,0.45), 0 0 80px rgba(0,100,255,0.2); }
+      50%      { box-shadow: 0 0 60px rgba(0,212,255,0.65), 0 0 100px rgba(0,100,255,0.3); }
+    }
+    .login-title    { font-size: 26px; font-weight: 700; letter-spacing: 3px; }
+    .login-subtitle { font-size: 12px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+    .divider-line {
+      display: flex; align-items: center; gap: 12px; margin: 28px 0;
+      color: var(--text-muted); font-size: 12px;
+    }
+    .divider-line::before,.divider-line::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="auth-page" style="background: radial-gradient(ellipse 70% 45% at 50% -5%, rgba(0,60,180,0.18), transparent), var(--bg);">
+
+  <div class="auth-card">
+
+    <div class="login-visual">
+      <div class="login-glow">⚡</div>
+      <div class="login-title">NEXUS</div>
+      <div class="login-subtitle">AI Operating System</div>
+    </div>
+
+    <div class="auth-heading">Welcome back, Founder.</div>
+    <div class="auth-subheading">Sign in to your private NEXUS instance.</div>
+
+    {% if error %}
+    <div class="alert alert-error mb-16">
+      <span>⚠</span> {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <div class="input-group">
+          <span class="input-icon">✉</span>
+          <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required autofocus>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔑</span>
+          <input type="password" name="password" class="form-input" placeholder="Your secure password" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg w-full mt-8">
+        ⚡ Enter NEXUS
+      </button>
+    </form>
+
+    <div class="divider-line">Secured by NEXUS Auth</div>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;">
+      NEXUS is a private system. Unauthorised access is prohibited.
+    </p>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
+</body>
+</html>

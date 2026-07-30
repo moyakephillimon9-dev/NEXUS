@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 LM Studio AI Provider
 
 Module ID : LMSTUDIO-001

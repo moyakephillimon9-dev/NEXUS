@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Performance AI — Runtime Profiling Engine
 
 Module ID : PERFORMANCE-001

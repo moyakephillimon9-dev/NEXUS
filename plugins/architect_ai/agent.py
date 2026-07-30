@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Architect AI — Comprehensive Systems Design Engine
 
 Module ID : ARCHITECT-001

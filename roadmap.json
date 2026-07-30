@@ -1,0 +1,124 @@
+{
+  "version": "0.1.0",
+  "project": "NEXUS",
+  "description": "AI Operating System — Full Roadmap",
+  "last_updated": "2026-07-30",
+  "milestones": [
+    {
+      "version": "0.1.0",
+      "name": "Foundation Release",
+      "status": "complete",
+      "released": "2026-07-30",
+      "description": "Core platform with web UI, authentication, dashboard, chat, builder, workers, memory, reports and settings.",
+      "features": [
+        "Owner authentication and first-time setup",
+        "Owner dashboard with stats and cards",
+        "Chat with NEXUS (built-in reasoning engine)",
+        "Project Builder (21-stage pipeline)",
+        "AI Worker Manager (22 workers)",
+        "Memory system and timeline",
+        "Reports (daily/weekly)",
+        "Settings (AI provider, security)",
+        "Plugin architecture",
+        "Roadmap system"
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "name": "LLM Integration",
+      "status": "planned",
+      "target": "2026-Q3",
+      "description": "Connect real LLM providers for genuine AI responses in all 21 pipeline stages.",
+      "features": [
+        "OpenRouter integration",
+        "Ollama (local) integration",
+        "LM Studio integration",
+        "Streaming responses from real LLM",
+        "Model selection per worker",
+        "Token usage tracking"
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "name": "Voice Interface",
+      "status": "planned",
+      "target": "2026-Q4",
+      "description": "Talk to NEXUS with voice commands and hear spoken responses.",
+      "features": [
+        "Speech-to-text input",
+        "Text-to-speech output",
+        "Voice pipeline commands",
+        "Wake-word activation"
+      ]
+    },
+    {
+      "version": "0.4.0",
+      "name": "Mobile & Desktop App Creation",
+      "status": "planned",
+      "target": "2027-Q1",
+      "description": "NEXUS can generate Android, iOS and desktop applications.",
+      "features": [
+        "Android app generation",
+        "iOS app generation (Flutter)",
+        "Desktop app generation (Electron)",
+        "App store deployment guidance"
+      ]
+    },
+    {
+      "version": "0.5.0",
+      "name": "Financial Management",
+      "status": "future",
+      "target": "2027-Q2",
+      "description": "Track income, expenses, transactions and generate financial reports.",
+      "features": [
+        "Income tracking",
+        "Expense management",
+        "Transaction history",
+        "Revenue forecasting",
+        "Financial reports",
+        "Requires Founder approval for all financial actions"
+      ]
+    },
+    {
+      "version": "0.6.0",
+      "name": "Social Media Management",
+      "status": "future",
+      "target": "2027-Q3",
+      "description": "Manage Facebook, Instagram, TikTok, YouTube, X, LinkedIn and more.",
+      "features": [
+        "Post scheduling and creation",
+        "Caption and hashtag generation",
+        "Engagement analytics",
+        "Requires Founder approval for every action"
+      ]
+    },
+    {
+      "version": "0.7.0",
+      "name": "Marketing & Advertising",
+      "status": "future",
+      "target": "2027-Q4",
+      "description": "Create full marketing campaigns with posters, videos and ad copy.",
+      "features": [
+        "AI poster generation",
+        "AI video creation",
+        "Ad copy writing",
+        "Campaign performance estimation"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "name": "Full AI Operating System",
+      "status": "future",
+      "target": "2028-Q1",
+      "description": "Complete AI OS: builds, manages, markets and monetises the Founder's digital empire.",
+      "features": [
+        "All v0.x features combined",
+        "Customer management",
+        "App ecosystem management",
+        "Digital twin system",
+        "Automated business reporting",
+        "Self-improvement with Founder approval"
+      ]
+    }
+  ]
+}

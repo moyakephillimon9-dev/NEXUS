@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Memory AI — Autonomous Semantic Graph Engine
 
 Module ID : MEMORY-001

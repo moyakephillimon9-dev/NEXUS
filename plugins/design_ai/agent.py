@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Design AI — UI/UX Specification Engine
 
 Module ID : DESIGN-001

@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Verification AI — Pre-Release Honesty & Completeness Engine
 
 Module ID : VERIFY-001

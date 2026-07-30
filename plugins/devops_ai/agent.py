@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 DevOps AI — Infrastructure & CI/CD Engineering Engine
 
 Module ID : DEVOPS-001
@@ -48,7 +48,7 @@ class DevOpsAI:
 
     def _dockerfile(self, python_version: str = "3.12") -> str:
         return f"""\
-# ── NEXUS Builder — Auto-generated Dockerfile ──────────────────────
+# ── NEXUS — Auto-generated Dockerfile ──────────────────────
 # Stage 1: builder
 FROM python:{python_version}-slim AS builder
 
@@ -83,7 +83,7 @@ CMD ["python", "main.py"]
 
     def _github_ci(self, python_version: str = "3.12") -> str:
         return f"""\
-# ── NEXUS Builder — Auto-generated GitHub Actions CI ───────────────
+# ── NEXUS — Auto-generated GitHub Actions CI ───────────────
 name: NEXUS CI Pipeline
 
 on:
@@ -144,7 +144,7 @@ jobs:
     @staticmethod
     def _makefile() -> str:
         return """\
-# ── NEXUS Builder — Auto-generated Makefile ────────────────────────
+# ── NEXUS — Auto-generated Makefile ────────────────────────
 .PHONY: install run test lint clean docker-build docker-run
 
 install:
@@ -177,7 +177,7 @@ docker-run:
     @staticmethod
     def _docker_compose() -> str:
         return """\
-# ── NEXUS Builder — Auto-generated docker-compose.yml ──────────────
+# ── NEXUS — Auto-generated docker-compose.yml ──────────────
 version: "3.9"
 
 services:

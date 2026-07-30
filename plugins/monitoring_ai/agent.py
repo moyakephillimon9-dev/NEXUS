@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Monitoring AI — Observability Engineering Engine
 
 Module ID : MONITOR-001

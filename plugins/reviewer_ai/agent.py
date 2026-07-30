@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Reviewer AI — Failure Prevention Engine
 
 Module ID : REVIEWER-001

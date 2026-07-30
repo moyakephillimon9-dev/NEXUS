@@ -1,6 +1,7 @@
-# NEXUS Builder — Runtime Dependencies
-# All core functionality uses Python stdlib only.
-# Install with: pip install -r requirements.txt
+# NEXUS — Runtime Dependencies
+
+# Web framework
+flask>=3.0.0
 
 # Optional: faster async event loop for Memory AI
 # uvloop>=0.19.0

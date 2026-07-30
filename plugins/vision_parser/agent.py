@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Vision Parser AI — Master Vision Document Intelligence Engine
 
 Module ID : VISION-001

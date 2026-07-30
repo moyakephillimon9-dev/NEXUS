@@ -1,6 +1,6 @@
 """
 =========================================================
-NEXUS Builder
+NEXUS
 Core Kernel
 
 Module ID : KERNEL-001
@@ -30,7 +30,7 @@ class Kernel:
     def boot(self):
 
         print("=" * 60)
-        print("NEXUS Builder")
+        print("NEXUS")
         print(f"Kernel Version : {self.VERSION}")
         print("=" * 60)
 

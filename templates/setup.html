@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — First-Time Setup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
+  <style>
+    .setup-steps { display: flex; gap: 8px; margin-bottom: 32px; justify-content: center; }
+    .step {
+      width: 28px; height: 4px; border-radius: 99px;
+      background: rgba(255,255,255,0.1);
+      transition: background 0.3s;
+    }
+    .step.active   { background: var(--blue); }
+    .step.complete { background: var(--green); }
+    .setup-banner {
+      background: rgba(0,212,255,0.06); border: 1px solid var(--blue-border);
+      border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+      font-size: 13px; color: #80e8ff; line-height: 1.6;
+    }
+    .setup-banner strong { color: var(--blue); }
+  </style>
+</head>
+<body>
+<div class="auth-page" style="background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,80,200,0.15), transparent), var(--bg);">
+
+  <div class="auth-card" style="max-width: 540px;">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⚡</div>
+      <div class="auth-logo-text">
+        <div class="auth-logo-title" style="letter-spacing:3px">NEXUS</div>
+        <div class="auth-logo-sub">AI Operating System</div>
+      </div>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="setup-steps">
+      <div class="step active"></div>
+      <div class="step"></div>
+      <div class="step"></div>
+      <div class="step"></div>
+    </div>
+
+    <div class="auth-heading">Welcome, Founder.</div>
+    <div class="auth-subheading">Set up your private NEXUS instance. This information is stored securely and never shared.</div>
+
+    {% if error %}
+    <div class="alert alert-error mb-16">
+      <span>⚠</span> {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="setup-banner">
+      <strong>🔐 Private & Secure</strong><br>
+      NEXUS is your private AI Operating System. Only you will have access.
+      Your credentials are encrypted and stored locally.
+    </div>
+
+    <form method="POST" action="{{ url_for('setup') }}">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="full_name" class="form-input" placeholder="Moyake Phillimon" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company / Brand Name</label>
+          <input type="text" name="company" class="form-input" placeholder="NEXUS">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email Address *</label>
+          <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" name="phone" class="form-input" placeholder="+1 000 000 0000">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Country</label>
+          <input type="text" name="country" class="form-input" placeholder="South Africa">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time Zone</label>
+          <select name="timezone" class="form-select">
+            <option value="UTC">UTC</option>
+            <option value="Africa/Johannesburg">Africa/Johannesburg (SAST)</option>
+            <option value="America/New_York">America/New_York (EST)</option>
+            <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+            <option value="Europe/London">Europe/London (GMT)</option>
+            <option value="Europe/Berlin">Europe/Berlin (CET)</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+            <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+            <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Secure Password *</label>
+          <input type="password" name="password" class="form-input" placeholder="Min. 8 characters" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password *</label>
+          <input type="password" name="password2" class="form-input" placeholder="Repeat password" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg w-full mt-8">
+        ⚡ Activate NEXUS
+      </button>
+    </form>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
+</body>
+</html>

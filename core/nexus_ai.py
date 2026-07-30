@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 NEXUS AI Engine — Central Intelligence Layer
 
 Module ID : NEXUS-AI-001

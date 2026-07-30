@@ -1,9 +1,9 @@
 """
-NEXUS Builder
+NEXUS — AI Operating System
 Configuration Manager
 
 Module ID : CONFIG-001
-Version   : 0.0.4
+Version   : 0.1.0
 """
 
 from pathlib import Path
@@ -11,9 +11,9 @@ from pathlib import Path
 
 class Config:
 
-    VERSION = "0.0.4"
+    VERSION = "0.1.0"
 
-    PROJECT_NAME = "NEXUS Builder"
+    PROJECT_NAME = "NEXUS"
 
     OWNER = "Moyake Phillimon"
 

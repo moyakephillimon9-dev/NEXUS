@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 OpenRouter AI Provider
 
 Module ID : OPENROUTER-001
@@ -76,7 +76,7 @@ class OpenRouterProvider(AIProvider):
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type":  "application/json",
                 "HTTP-Referer":  "https://nexus-builder.replit.app",
-                "X-Title":       "NEXUS Builder",
+                "X-Title":       "NEXUS",
             },
             method="POST",
         )

@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Capability Assessor AI — Honest Feature Classification Engine
 
 Module ID : ASSESS-001
@@ -21,7 +21,7 @@ class CapabilityAssessorAI:
     """
     Honest Feature Classification Engine.
 
-    Compares requested features/modules against NEXUS Builder's real
+    Compares requested features/modules against NEXUS's real
     capabilities and produces a transparent gap report.
 
     This engine NEVER claims capability that does not exist.
@@ -262,7 +262,7 @@ class CapabilityAssessorAI:
         score: float,
     ) -> str:
         lines = [
-            f"NEXUS Builder can fully implement {len(fully)} capabilities,",
+            f"NEXUS can fully implement {len(fully)} capabilities,",
             f"partially implement {len(partially)} capabilities,",
             f"and cannot currently implement {len(unsup)} capabilities.",
             f"Overall build feasibility: {score}%.",

@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 =============
 Private AI Software Engineering Company
 
@@ -54,7 +54,7 @@ BANNER = r"""
 | |\  || |_____ | |__| | |__| |____) |
 |_| \_||_______||_____/ \____/|_____/
 
-NEXUS Builder  v{version}
+NEXUS  v{version}
 Private AI Software Engineering Company
 Owner : {owner}
 {line}
@@ -310,7 +310,7 @@ def interactive_menu():
         print("  [2]  Run pipeline from a vision document file")
         print("  [3]  List all AI workers")
         print("  [4]  View project history")
-        print("  [5]  About NEXUS Builder")
+        print("  [5]  About NEXUS")
         print("  [6]  AI Provider Settings")
         print("  [Q]  Quit")
         print()
@@ -344,7 +344,7 @@ def interactive_menu():
             action_ai_settings()
 
         elif choice in ("Q", "QUIT", "EXIT"):
-            print("\n  NEXUS Builder shutting down. Goodbye.\n")
+            print("\n  NEXUS shutting down. Goodbye.\n")
             break
 
         else:
@@ -358,7 +358,7 @@ def interactive_menu():
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nexus",
-        description="NEXUS Builder — Private AI Software Engineering Company",
+        description="NEXUS — Private AI Software Engineering Company",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -414,7 +414,7 @@ def main():
     args   = parser.parse_args()
 
     if args.version:
-        print(f"NEXUS Builder v{Config.VERSION}")
+        print(f"NEXUS v{Config.VERSION}")
         sys.exit(0)
 
     if args.workers:

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Builder{% endblock %}
+{% block page_title %}Builder{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">NEXUS Builder</div>
+    <div class="section-sub">Describe what you want — NEXUS runs the 21-stage pipeline automatically</div>
+  </div>
+</div>
+
+<!-- App type selection -->
+<div class="card mb-24">
+  <div class="card-title mb-16">What are you building?</div>
+  <div class="builder-types">
+    {% set types = [
+      ('🌐', 'Web Application',   'web'),
+      ('📱', 'Android App',       'android'),
+      ('🍎', 'iOS App',           'ios'),
+      ('🖥', 'Desktop App',       'desktop'),
+      ('🤖', 'AI System',         'ai'),
+      ('🎮', 'Game',              'game'),
+      ('🏢', 'Business System',   'business'),
+      ('📊', 'Dashboard',         'dashboard'),
+      ('🔌', 'API Service',       'api'),
+      ('⚙️', 'Automation Tool',   'automation'),
+    ] %}
+    {% for icon, name, dtype in types %}
+    <div class="build-type" data-type="{{ name }}" onclick="selectType(this, '{{ name }}')">
+      <div class="build-type-icon">{{ icon }}</div>
+      <div class="build-type-name">{{ name }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Build form -->
+<div class="card mb-24">
+  <div class="card-title mb-16">Describe Your Goal</div>
+  <form id="build-form">
+    <div class="form-group">
+      <label class="form-label">What do you want to build?</label>
+      <textarea
+        id="build-goal"
+        class="form-input form-textarea"
+        placeholder="Describe your Web Application in detail…"
+        rows="4"
+        required
+      ></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Target Users (optional)</label>
+        <input type="text" id="build-users" class="form-input" placeholder="e.g. Small businesses, developers…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Key Features (optional)</label>
+        <input type="text" id="build-features" class="form-input" placeholder="e.g. Login, dashboard, notifications…">
+      </div>
+    </div>
+    <div class="flex gap-12 mt-8">
+      <button type="submit" id="build-btn" class="btn btn-primary btn-lg">
+        ⚡ Start Pipeline
+      </button>
+      <div style="flex:1;display:flex;align-items:center;gap:12px;" id="build-progress-wrap" style="display:none;">
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--text-muted);" id="build-stage-label">Initializing…</span>
+            <span style="font-size:12px;font-weight:600;color:var(--blue);" id="build-pct">0%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="build-progress-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Console -->
+<div id="build-progress-wrap" style="display:none;" class="card">
+  <div class="section-header mb-12">
+    <div class="card-title">Pipeline Console</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;color:var(--text-muted);" id="build-stage-label">—</span>
+      <span style="font-size:13px;font-weight:700;color:var(--blue);" id="build-pct">0%</span>
+    </div>
+    <div class="progress-bar" style="margin-bottom:16px;">
+      <div class="progress-fill" id="build-progress-bar" style="width:0%"></div>
+    </div>
+  </div>
+  <div class="build-console" id="build-console">
+    <span class="log-line" style="color:var(--text-muted);">[NEXUS] Waiting for input…</span>
+  </div>
+</div>
+
+<!-- Pipeline overview -->
+<div class="card mt-24">
+  <div class="card-title mb-16">The NEXUS Pipeline — 21 Stages</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
+    {% set stages = [
+      ('0', 'Vision Parser',       'Parses goal → requirements'),
+      ('1', 'Capability Assessor', 'Checks feature support'),
+      ('2', 'Research AI',         'Searches knowledge base'),
+      ('3', 'Module Detector',     'Builds dependency graph'),
+      ('4', 'Planner AI',          'Creates 19-phase plan'),
+      ('5', 'Architect AI',        'Designs architecture'),
+      ('6', 'Database AI',         'Designs schema'),
+      ('7', 'Coder AI',            'Writes source code'),
+      ('8', 'Design AI',           'Creates UI/UX'),
+      ('9', 'Reviewer AI',         'Reviews code quality'),
+      ('10','Tester AI',           'Writes & runs tests'),
+      ('11','Security AI',         'Security scanning'),
+      ('12','Performance AI',      'Performance analysis'),
+      ('13','Documentation AI',    'Generates docs'),
+      ('14','Monitoring AI',       'Sets up monitoring'),
+      ('15','Integration AI',      'Wires integrations'),
+      ('16','DevOps AI',           'CI/CD & containers'),
+      ('17','Deployment AI',       'Deployment artefacts'),
+      ('18','Verification AI',     'Verifies completion'),
+      ('19','Progress Tracker',    'Tracks timeline'),
+      ('20','Memory AI',           'Saves to memory'),
+    ] %}
+    {% for num, name, desc in stages %}
+    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="font-size:10px;color:var(--blue);font-weight:700;margin-bottom:4px;">Stage {{ num }}</div>
+      <div style="font-size:13px;font-weight:600;">{{ name }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ desc }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function selectType(el, name) {
+  document.querySelectorAll('.build-type').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+  const goal = document.getElementById('build-goal');
+  if (goal) goal.placeholder = `Describe your ${name} in detail…`;
+}
+</script>
+{% endblock %}

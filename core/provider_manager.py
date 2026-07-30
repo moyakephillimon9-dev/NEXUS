@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Provider Manager
 
 Module ID : PROVIDER-MANAGER-001

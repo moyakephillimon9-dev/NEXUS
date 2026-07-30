@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Plugin Manager
 
 Module ID : PLUGIN-001

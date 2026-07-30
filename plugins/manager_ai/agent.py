@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Manager AI — Master Strategic Advisor Core
 
 Module ID : MANAGER-001

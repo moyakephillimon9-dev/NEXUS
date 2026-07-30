@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Chat{% endblock %}
+{% block page_title %}Chat with NEXUS{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+
+  <!-- Message list -->
+  <div class="chat-messages" id="chat-messages">
+
+    {% if not history %}
+    <div id="chat-welcome" class="chat-welcome">
+      <div class="chat-welcome-icon">⚡</div>
+      <h2>How can I help you today?</h2>
+      <p>I'm NEXUS, your AI Operating System. Ask me anything about your projects, workers, or what to build next.</p>
+      <div class="chat-suggestions">
+        <span class="chat-suggestion">What can you do?</span>
+        <span class="chat-suggestion">Show me my workers</span>
+        <span class="chat-suggestion">How does the pipeline work?</span>
+        <span class="chat-suggestion">Build a web app for me</span>
+        <span class="chat-suggestion">What version is this?</span>
+        <span class="chat-suggestion">Tell me about the roadmap</span>
+      </div>
+    </div>
+    {% else %}
+      {% for msg in history %}
+      <div class="msg {{ msg.role }}">
+        <div class="msg-avatar">{{ '⚡' if msg.role == 'nexus' else '👤' }}</div>
+        <div class="msg-body">
+          <div class="msg-sender">{{ 'NEXUS' if msg.role == 'nexus' else 'You' }}</div>
+          <div class="msg-bubble">{{ msg.content | replace('\n', '<br>') | safe }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+
+  </div>
+
+  <!-- Input area -->
+  <div class="chat-input-area">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;gap:8px;">
+      <button id="chat-clear" class="btn btn-ghost btn-sm" title="Clear chat history">🗑 Clear</button>
+    </div>
+    <div class="chat-input-box">
+      <textarea
+        id="chat-input"
+        class="chat-textarea"
+        placeholder="Message NEXUS…"
+        rows="1"
+      ></textarea>
+      <button id="chat-send" class="btn btn-primary btn-sm" style="align-self:flex-end;">
+        ➤ Send
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px;">
+      NEXUS v0.1.0 — Built-in reasoning engine. Connect an LLM provider in Settings for richer responses.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Scroll to bottom on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const mc = document.getElementById('chat-messages');
+    if (mc) mc.scrollTop = mc.scrollHeight;
+  });
+</script>
+{% endblock %}

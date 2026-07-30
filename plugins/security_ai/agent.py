@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Security AI — Vulnerability Analysis Engine
 
 Module ID : SECURITY-001

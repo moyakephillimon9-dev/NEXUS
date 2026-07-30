@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Database AI — Schema Design Engine
 
 Module ID : DATABASE-001

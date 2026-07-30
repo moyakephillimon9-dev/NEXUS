@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Shared Memory
 
 Module ID : MEMORY-001

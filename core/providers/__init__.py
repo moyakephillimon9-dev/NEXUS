@@ -1,5 +1,5 @@
 """
-NEXUS Builder — AI Providers package
+NEXUS — AI Providers package
 
 Available providers
 -------------------

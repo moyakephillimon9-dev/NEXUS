@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Settings Manager
 
 Module ID : SETTINGS-001

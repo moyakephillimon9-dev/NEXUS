@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Module Detector AI — Architecture Module & Dependency Graph Engine
 
 Module ID : MODULE-001

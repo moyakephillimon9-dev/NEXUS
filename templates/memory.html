@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Memory{% endblock %}
+{% block page_title %}Memory{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">NEXUS Memory</div>
+    <div class="section-sub">Persistent knowledge across all projects and sessions</div>
+  </div>
+</div>
+
+{% if memories %}
+<div class="grid-2 mb-24">
+  <div class="card">
+    <div style="font-size:36px;font-weight:700;color:var(--blue);text-shadow:0 0 20px rgba(0,212,255,0.3);">
+      {{ memories | length }}
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Memory Categories</div>
+  </div>
+  <div class="card">
+    <div style="font-size:36px;font-weight:700;color:var(--green);text-shadow:0 0 20px rgba(0,255,153,0.3);">
+      {{ memories.values() | map('length') | sum if memories else 0 }}
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Total Entries</div>
+  </div>
+</div>
+
+<div class="memory-timeline">
+  {% for key, value in memories.items() %}
+  <div class="memory-item fade-up">
+    <div class="memory-ts">Memory Store</div>
+    <div class="memory-key">{{ key | replace('_', ' ') | title }}</div>
+    <div class="memory-val">
+      {% if value is mapping %}
+        {% for k, v in value.items() %}
+          <div style="margin-bottom:4px;"><strong style="color:var(--text-mid);">{{ k }}:</strong> {{ v | string | truncate(120) }}</div>
+        {% endfor %}
+      {% elif value is iterable and value is not string %}
+        {% for item in value[:5] %}
+          <div style="margin-bottom:2px;">• {{ item | string | truncate(100) }}</div>
+        {% endfor %}
+        {% if value | length > 5 %}
+          <div style="color:var(--text-muted);font-size:12px;margin-top:4px;">… and {{ value | length - 5 }} more entries</div>
+        {% endif %}
+      {% else %}
+        {{ value | string | truncate(200) }}
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-state-icon">🧠</div>
+    <h3>Memory is empty</h3>
+    <p>Run your first pipeline and NEXUS will start building its knowledge base. Every project teaches NEXUS something new.</p>
+    <a href="{{ url_for('builder') }}" class="btn btn-primary">🔨 Run First Pipeline</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Memory categories -->
+<div class="card mt-24">
+  <div class="card-title mb-16">What NEXUS Remembers</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+    {% set categories = [
+      ('📦', 'Projects', 'Every project built'),
+      ('🏗', 'Architecture', 'System designs used'),
+      ('🔧', 'Solutions', 'Problems solved'),
+      ('⚠', 'Mistakes', 'Errors to avoid'),
+      ('💡', 'Patterns', 'Reusable code patterns'),
+      ('👤', 'Preferences', 'Owner preferences'),
+    ] %}
+    {% for icon, name, desc in categories %}
+    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:14px;">
+      <div style="font-size:22px;margin-bottom:8px;">{{ icon }}</div>
+      <div style="font-size:13px;font-weight:600;">{{ name }}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">{{ desc }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Planner AI — Master Project Planning Engine
 
 Module ID : PLANNER-001

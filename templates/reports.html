@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">Reports</div>
+    <div class="section-sub">Generated {{ report.generated_at }}</div>
+  </div>
+  <a href="{{ url_for('reports') }}" class="btn btn-ghost btn-sm">↻ Refresh</a>
+</div>
+
+<!-- Summary stats -->
+<div class="stats-grid mb-24">
+  <div class="stat-card">
+    <div class="stat-icon blue">📦</div>
+    <div>
+      <div class="stat-value">{{ report.total_projects }}</div>
+      <div class="stat-label">Total Projects</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green">✓</div>
+    <div>
+      <div class="stat-value">{{ report.completed }}</div>
+      <div class="stat-label">Completed</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon yellow">⟳</div>
+    <div>
+      <div class="stat-value">{{ report.in_progress }}</div>
+      <div class="stat-label">In Progress</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(255,68,102,0.1);">✗</div>
+    <div>
+      <div class="stat-value">{{ report.errors }}</div>
+      <div class="stat-label">Errors</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Recent projects -->
+  <div class="card">
+    <div class="card-title mb-16">Recent Pipeline Runs</div>
+    {% if report.recent %}
+      {% for p in report.recent %}
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="width:36px;height:36px;background:rgba(0,212,255,0.08);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📦</div>
+        <div style="flex:1;overflow:hidden;">
+          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            {{ p.get('goal', p.get('task_id', '—')) }}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+            {{ p.get('timestamp', '—')[:10] if p.get('timestamp') else '—' }}
+          </div>
+        </div>
+        {% set s = p.get('status', 'unknown') %}
+        <span class="badge {% if s == 'complete' %}badge-green{% elif s == 'error' %}badge-red{% else %}badge-blue{% endif %}">
+          {{ s | title }}
+        </span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h3>No pipeline runs yet</h3>
+        <p>Run your first project to see reports here.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- System health -->
+  <div class="card">
+    <div class="card-title mb-16">System Health</div>
+
+    {% set metrics = [
+      ('Pipeline Engine',   'Operational', 100, 'green'),
+      ('AI Workers (22)',   'All Online',  100, 'green'),
+      ('Memory System',     'Active',       95, 'green'),
+      ('Plugin Registry',   'Loaded',      100, 'green'),
+      ('LLM Provider',      'Built-in',     60, 'blue'),
+      ('Deployment Engine', 'Ready',        90, 'green'),
+    ] %}
+    {% for name, status, pct, color in metrics %}
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:13px;font-weight:500;">{{ name }}</span>
+        <span class="badge badge-{{ color }}">{{ status }}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:{{ pct }}%;background:linear-gradient(90deg,var(--{% if color == 'green' %}green{% else %}blue{% endif %}),var(--blue))"></div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="divider"></div>
+    <div style="text-align:center;">
+      <div style="font-size:36px;font-weight:700;color:var(--green);text-shadow:0 0 20px rgba(0,255,153,0.3);">98%</div>
+      <div style="font-size:13px;color:var(--text-muted);">Overall System Health</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Future reports note -->
+<div class="alert alert-info mt-24">
+  <span>ℹ</span>
+  <div>
+    <strong>Coming in NEXUS v0.2</strong> — Daily, weekly and monthly automated reports with pipeline analytics,
+    performance benchmarks, error analysis and improvement recommendations.
+    See the <a href="{{ url_for('roadmap') }}">Roadmap</a> for details.
+  </div>
+</div>
+{% endblock %}

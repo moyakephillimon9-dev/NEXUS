@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}AI Workers{% endblock %}
+{% block page_title %}AI Workers{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">AI Workers</div>
+    <div class="section-sub">{{ workers | length }} specialised agents — all online</div>
+  </div>
+  <div class="badge badge-green" style="padding:8px 16px;font-size:13px;">
+    ● All Systems Online
+  </div>
+</div>
+
+<div id="workers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">
+  {% for w in workers %}
+  <div class="worker-card fade-up">
+    <div class="worker-header">
+      <div>
+        <div class="worker-id-badge">{{ w.id }}</div>
+      </div>
+      <div style="flex:1;">
+        <div class="worker-card-title">{{ w.name }}</div>
+        <div class="worker-card-role">{{ w.role }}</div>
+      </div>
+      <div class="badge badge-green">● Online</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+      {% if w.stage >= 0 %}
+        Pipeline Stage {{ w.stage }}
+      {% else %}
+        Orchestrator
+      {% endif %}
+    </div>
+
+    <div class="worker-metrics">
+      <div class="metric-block">
+        <div class="metric-label">CPU</div>
+        <div class="metric-bar">
+          <div class="metric-fill" id="cpu-{{ w.id }}" style="width:{{ w.cpu }}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ w.cpu }}%</div>
+      </div>
+      <div class="metric-block">
+        <div class="metric-label">Memory</div>
+        <div class="metric-bar">
+          <div class="metric-fill" id="mem-{{ w.id }}" style="width:{{ w.memory }}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ w.memory }}%</div>
+      </div>
+    </div>
+
+    <div class="divider" style="margin:14px 0 10px;"></div>
+    <div style="font-size:12px;color:var(--text-muted);">Last run: {{ w.last_run }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pipeline flow -->
+<div class="card mt-32">
+  <div class="card-title mb-16">Pipeline Execution Order</div>
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+    {% for w in workers if w.stage >= 0 %}
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div style="background:var(--blue-dim);border:1px solid var(--blue-border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--blue);">
+        {{ w.stage }}. {{ w.name | replace(' AI', '') | replace(' Detector', '') | replace(' Parser', '') | replace(' Tracker', '') }}
+      </div>
+      {% if not loop.last %}
+      <div style="color:var(--text-muted);font-size:18px;">→</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

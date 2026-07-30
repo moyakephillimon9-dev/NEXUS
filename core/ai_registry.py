@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 AI Registry
 
 Module ID : REGISTRY-001

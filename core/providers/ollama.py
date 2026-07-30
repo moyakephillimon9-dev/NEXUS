@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Ollama AI Provider
 
 Module ID : OLLAMA-001

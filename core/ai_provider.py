@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 AI Provider — Abstract Base Class
 
 Module ID : AI-PROVIDER-001

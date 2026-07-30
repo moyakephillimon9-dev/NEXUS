@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Research AI — Permanent Intelligence System
 
 Module ID : RESEARCH-001

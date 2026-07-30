@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Projects{% endblock %}
+{% block page_title %}Projects{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">All Projects</div>
+    <div class="section-sub">{{ projects | length }} project{{ 's' if projects | length != 1 else '' }} built by NEXUS</div>
+  </div>
+  <a href="{{ url_for('builder') }}" class="btn btn-primary">🔨 New Project</a>
+</div>
+
+{% if projects %}
+<div style="display:flex;flex-direction:column;gap:14px;">
+  {% for p in projects %}
+  <div class="card" style="display:flex;align-items:center;gap:20px;">
+    <div style="width:44px;height:44px;background:rgba(0,212,255,0.08);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>
+    <div style="flex:1;overflow:hidden;">
+      <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        {{ p.get('goal', p.get('task_id', 'Unknown Project')) }}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">
+        Task ID: {{ p.get('task_id', '—') }} &nbsp;·&nbsp;
+        {{ p.get('timestamp', p.get('created_at', '—'))[:19] | replace('T', ' ') if p.get('timestamp') or p.get('created_at') else '—' }}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      {% set status = p.get('status', 'unknown') %}
+      {% if status == 'complete' %}
+        <span class="badge badge-green">✓ Complete</span>
+      {% elif status == 'running' %}
+        <span class="badge badge-blue">⟳ Running</span>
+      {% elif status == 'error' %}
+        <span class="badge badge-red">✗ Error</span>
+      {% else %}
+        <span class="badge badge-gray">{{ status | title }}</span>
+      {% endif %}
+
+      {% if p.get('pipeline_score') %}
+      <div style="text-align:right;">
+        <div style="font-size:18px;font-weight:700;color:var(--blue);">{{ p.pipeline_score }}%</div>
+        <div style="font-size:11px;color:var(--text-muted);">Score</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-state-icon">📂</div>
+    <h3>No projects yet</h3>
+    <p>Start your first build and NEXUS will run the full 21-stage pipeline to create your software.</p>
+    <a href="{{ url_for('builder') }}" class="btn btn-primary">🔨 Build Your First App</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

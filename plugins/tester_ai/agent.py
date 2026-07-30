@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Tester AI — Master Runtime Validation Engine
 
 Module ID : TESTER-001

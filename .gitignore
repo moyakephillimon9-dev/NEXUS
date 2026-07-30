@@ -15,3 +15,7 @@ memory/backups/
 
 # Research and knowledge caches
 research/
+
+# Owner data (encrypted but sensitive — never commit)
+data/owner.json
+data/chat_history.json

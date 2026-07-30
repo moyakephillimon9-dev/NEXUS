@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Progress Tracker AI — Build Completion & Gap Reporting Engine
 
 Module ID : PROGRESS-001
@@ -252,7 +252,7 @@ class ProgressTrackerAI:
             #   Says nothing about whether the requested features are built.
             "pipeline_execution_pct": pipeline_execution_pct,
             # vision_coverage_pct : of the features requested in the goal/vision,
-            #   what fraction can actually be built by NEXUS Builder right now?
+            #   what fraction can actually be built by NEXUS right now?
             #   Comes directly from Capability Assessor (ASSESS-001).
             "vision_coverage_pct":    vision_coverage_pct,
             # ── Legacy key kept for backward compat ─────────────────────

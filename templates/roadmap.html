@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Roadmap{% endblock %}
+{% block page_title %}Roadmap{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">NEXUS Roadmap</div>
+    <div class="section-sub">From v0.1 Foundation to the Full AI Operating System</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <span class="badge badge-green">● v0.1 Released</span>
+    <span class="badge badge-blue">◐ {{ roadmap.milestones | selectattr('status','eq','planned') | list | length }} Planned</span>
+    <span class="badge badge-gray">○ {{ roadmap.milestones | selectattr('status','eq','future') | list | length }} Future</span>
+  </div>
+</div>
+
+<!-- Honesty note -->
+<div class="alert alert-info mb-24">
+  <span>📊</span>
+  <div>
+    <strong>Honest Progress Reporting</strong> — NEXUS separates pipeline execution %, feature coverage %, and roadmap progress %.
+    These are never combined into one misleading number. Current version implements the v0.1 foundation only.
+  </div>
+</div>
+
+<div style="max-width:860px;">
+  {% for ms in roadmap.milestones %}
+  <div class="roadmap-item {{ ms.status }}">
+    <div class="roadmap-header">
+      <span class="roadmap-version">{{ ms.version }}</span>
+      <h3 class="roadmap-name">{{ ms.name }}</h3>
+      {% if ms.status == 'complete' %}
+        <span class="badge badge-green" style="margin-left:auto;">✓ Released — {{ ms.get('released', '') }}</span>
+      {% elif ms.status == 'planned' %}
+        <span class="badge badge-blue" style="margin-left:auto;">◐ Planned — {{ ms.get('target', '') }}</span>
+      {% else %}
+        <span class="badge badge-gray" style="margin-left:auto;">○ Future — {{ ms.get('target', 'TBD') }}</span>
+      {% endif %}
+    </div>
+    <p class="roadmap-desc">{{ ms.description }}</p>
+    <div class="feature-list">
+      {% for f in ms.features %}
+      <span class="feature-tag">{{ '✓ ' if ms.status == 'complete' else '' }}{{ f }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Vision statement -->
+<div class="card mt-32" style="background:linear-gradient(135deg,rgba(0,212,255,0.05),rgba(0,80,255,0.05));border-color:rgba(0,212,255,0.2);">
+  <div style="text-align:center;padding:24px;">
+    <div style="font-size:36px;margin-bottom:16px;">🚀</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:12px;">The Long-Term Vision</div>
+    <div style="font-size:14px;color:var(--text-muted);max-width:600px;margin:0 auto;line-height:1.8;">
+      NEXUS will become a complete AI Operating System capable of building, managing, marketing
+      and monetising the Founder's entire digital empire — from mobile apps to robotics,
+      from social media to smart home integration — all under one private, secure platform.
+    </div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px;">
+      {% for item in ['🤖 Robotics', '🏠 Smart Home', '🚗 Vehicles', '🕶 AR/VR', '🧠 AI Research', '📡 IoT', '🌍 Global Business', '🛰 Space Tech'] %}
+      <span class="feature-tag" style="border-color:rgba(0,212,255,0.2);color:var(--text-mid);">{{ item }}</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

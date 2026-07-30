@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Core Logger
 
 Module ID : LOGGER-001

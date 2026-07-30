@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Enterprise Orchestrator
 
 Module ID : ORCHESTRATOR-001

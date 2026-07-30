@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">Settings</div>
+    <div class="section-sub">Configure your NEXUS instance</div>
+  </div>
+</div>
+
+{% if saved %}
+<div class="alert alert-success mb-16">
+  <span>✓</span> Settings saved successfully.
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('settings') }}">
+<div style="display:flex;flex-direction:column;gap:20px;">
+
+  <!-- AI Provider -->
+  <div class="card">
+    <div class="card-title mb-4">🤖 AI Provider</div>
+    <div class="card-subtitle mb-20">Choose the AI engine powering NEXUS workers</div>
+
+    <div class="form-group">
+      <label class="form-label">Active Provider</label>
+      <select name="active_provider" class="form-select">
+        <option value="builtin"    {% if nexus_settings.get('active_provider','builtin') == 'builtin' %}selected{% endif %}>Built-in (No API key required)</option>
+        <option value="openrouter" {% if nexus_settings.get('active_provider') == 'openrouter' %}selected{% endif %}>OpenRouter</option>
+        <option value="ollama"     {% if nexus_settings.get('active_provider') == 'ollama' %}selected{% endif %}>Ollama (Local)</option>
+        <option value="lmstudio"   {% if nexus_settings.get('active_provider') == 'lmstudio' %}selected{% endif %}>LM Studio (Local)</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">OpenRouter Base URL</label>
+        <input type="text" name="openrouter_base_url" class="form-input"
+          value="{{ nexus_settings.get('openrouter_base_url','https://openrouter.ai/api/v1') }}"
+          placeholder="https://openrouter.ai/api/v1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">OpenRouter Model</label>
+        <input type="text" name="openrouter_model" class="form-input"
+          value="{{ nexus_settings.get('openrouter_model','meta-llama/llama-3.1-8b-instruct:free') }}"
+          placeholder="meta-llama/llama-3.1-8b-instruct:free">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Ollama Host</label>
+        <input type="text" name="ollama_host" class="form-input"
+          value="{{ nexus_settings.get('ollama_host','http://localhost:11434') }}"
+          placeholder="http://localhost:11434">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ollama Model</label>
+        <input type="text" name="ollama_model" class="form-input"
+          value="{{ nexus_settings.get('ollama_model','llama3.2') }}"
+          placeholder="llama3.2">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Max Tokens</label>
+        <input type="number" name="max_tokens" class="form-input"
+          value="{{ nexus_settings.get('max_tokens', 4096) }}" min="256" max="32768">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Temperature</label>
+        <input type="number" name="temperature" class="form-input"
+          value="{{ nexus_settings.get('temperature', 0.7) }}" min="0" max="2" step="0.1">
+      </div>
+    </div>
+
+    <div class="alert alert-info mt-8">
+      <span>ℹ</span>
+      <div>API keys for OpenRouter should be stored as Replit Secrets (OPENROUTER_API_KEY) for security. Never paste keys directly into settings fields.</div>
+    </div>
+  </div>
+
+  <!-- System -->
+  <div class="card">
+    <div class="card-title mb-4">⚙️ System</div>
+    <div class="card-subtitle mb-20">General NEXUS behaviour</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NEXUS Version</label>
+        <input type="text" class="form-input" value="0.1.0" disabled style="opacity:0.5;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Debug Mode</label>
+        <select name="debug_mode" class="form-select">
+          <option value="false" {% if not nexus_settings.get('debug_mode', True) %}selected{% endif %}>Off (Production)</option>
+          <option value="true"  {% if nexus_settings.get('debug_mode', True) %}selected{% endif %}>On (Development)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security note -->
+  <div class="card">
+    <div class="card-title mb-4">🔐 Security</div>
+    <div class="card-subtitle mb-16">Owner access controls</div>
+    <div class="alert alert-info">
+      <span>🔒</span>
+      <div>
+        <strong>NEXUS requires Founder approval before:</strong><br>
+        Deploying applications · Sending messages · Spending money · Deleting files · Updating itself · Changing security settings.<br><br>
+        Full two-factor authentication and granular permissions are planned for NEXUS v0.2.
+        See the <a href="{{ url_for('roadmap') }}">Roadmap</a>.
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <button type="submit" class="btn btn-primary btn-lg">💾 Save Settings</button>
+  </div>
+
+</div>
+</form>
+{% endblock %}

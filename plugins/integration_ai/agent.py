@@ -1,5 +1,5 @@
 """
-NEXUS Builder
+NEXUS
 Integration AI — Service Integration Engine
 
 Module ID : INTEGRATION-001
