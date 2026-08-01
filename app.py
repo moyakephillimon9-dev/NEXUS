@@ -6,17 +6,18 @@ Version : 0.1.0
 Owner   : Moyake Phillimon
 """
 
-import os, json, threading, time, datetime
+import os, json, threading, time, datetime, zipfile, io
 from pathlib import Path
 from functools import wraps
 
 from flask import (Flask, render_template, request, session,
-                   redirect, url_for, jsonify, Response)
+                   redirect, url_for, jsonify, Response, send_file)
 
 from core.auth import Auth
 from core.owner_manager import OwnerManager
 from core.nexus_brain import NexusBrain
 from core.config import Config
+from core import sms_otp
 
 # ── App bootstrap ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -108,6 +109,69 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SMS / PHONE VERIFICATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/phone/send-otp', methods=['POST'])
+def api_phone_send_otp():
+    """Send a 6-digit OTP to the given phone number (no auth required — used at setup)."""
+    phone = (request.json or {}).get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'Phone number is required.'}), 400
+    result = sms_otp.send_otp(phone)
+    return jsonify(result)
+
+
+@app.route('/api/phone/verify-otp', methods=['POST'])
+def api_phone_verify_otp():
+    """Verify an OTP code against a phone number (no auth required — used at setup)."""
+    data  = request.json or {}
+    phone = data.get('phone', '').strip()
+    code  = data.get('code', '').strip()
+    if not phone or not code:
+        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
+    result = sms_otp.verify_otp(phone, code)
+    if result['success']:
+        # Store verified phone in session so setup form can confirm it
+        session['phone_verified'] = phone
+    return jsonify(result)
+
+
+@app.route('/api/phone/send-otp-auth', methods=['POST'])
+@login_required
+def api_phone_send_otp_auth():
+    """Send OTP to an authenticated owner's phone (from Settings)."""
+    phone = (request.json or {}).get('phone', '').strip()
+    if not phone:
+        owner = owner_mgr.get_owner()
+        phone = owner.get('phone', '')
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on file.'}), 400
+    result = sms_otp.send_otp(phone)
+    return jsonify(result)
+
+
+@app.route('/api/phone/verify-otp-auth', methods=['POST'])
+@login_required
+def api_phone_verify_otp_auth():
+    """Verify OTP and mark phone as verified on the owner profile."""
+    data  = request.json or {}
+    phone = data.get('phone', '').strip()
+    code  = data.get('code', '').strip()
+    if not phone or not code:
+        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
+    result = sms_otp.verify_otp(phone, code)
+    if result['success']:
+        owner_mgr.update_owner({'phone': phone, 'phone_verified': True})
+    return jsonify(result)
+
+
+@app.route('/api/twilio/status')
+def api_twilio_status():
+    return jsonify({'configured': sms_otp.is_configured()})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -238,6 +302,55 @@ def api_build_status(task_id):
     return jsonify(build)
 
 
+@app.route('/api/build/<task_id>/files')
+@login_required
+def api_build_files(task_id):
+    """List files generated in the deployment folder for a completed build."""
+    build = active_builds.get(task_id)
+    if not build:
+        return jsonify({'error': 'Build not found'}), 404
+    deploy_path = build.get('deploy_path')
+    if not deploy_path or not Path(deploy_path).exists():
+        return jsonify({'files': [], 'deploy_path': deploy_path})
+
+    files = []
+    base = Path(deploy_path)
+    for fp in sorted(base.rglob('*')):
+        if fp.is_file():
+            rel = str(fp.relative_to(base))
+            size = fp.stat().st_size
+            files.append({'name': rel, 'size': size})
+    return jsonify({'files': files, 'deploy_path': str(base)})
+
+
+@app.route('/api/build/<task_id>/download')
+@login_required
+def api_build_download(task_id):
+    """Zip and serve the generated project as a downloadable archive."""
+    build = active_builds.get(task_id)
+    if not build:
+        return jsonify({'error': 'Build not found'}), 404
+    deploy_path = build.get('deploy_path')
+    if not deploy_path or not Path(deploy_path).exists():
+        return jsonify({'error': 'No deployment artefacts found — pipeline may have not completed.'}), 404
+
+    mem_zip = io.BytesIO()
+    base    = Path(deploy_path)
+    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fp in sorted(base.rglob('*')):
+            if fp.is_file():
+                zf.write(fp, fp.relative_to(base))
+    mem_zip.seek(0)
+
+    project_name = base.name.replace(' ', '_')
+    return send_file(
+        mem_zip,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f"{project_name}.zip",
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # WORKERS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -363,13 +476,28 @@ def _run_pipeline(task_id: str, goal: str):
         # Run actual orchestrator
         from core.orchestrator import Orchestrator
         build['logs'].append("[NEXUS] Pipeline executing…")
-        orch = Orchestrator()
-        orch.run(goal)
+        orch    = Orchestrator()
+        project = orch.run(goal)
 
-        build['status']   = 'complete'
-        build['progress'] = 100
-        build['stage']    = 'Complete'
-        build['logs'].append("[NEXUS] ✓ Pipeline complete. Artifacts saved.")
+        # Surface generated artefacts to the UI
+        deploy_path = None
+        if isinstance(project, dict):
+            deploy_path = project.get('deployment', {}).get('deployment_path')
+
+        build['status']      = 'complete'
+        build['progress']    = 100
+        build['stage']       = 'Complete'
+        build['deploy_path'] = deploy_path
+        build['result']      = {
+            'framework'    : project.get('architecture', {}).get('framework', 'Python') if isinstance(project, dict) else 'Python',
+            'language'     : project.get('architecture', {}).get('language', 'Python')  if isinstance(project, dict) else 'Python',
+            'deploy_path'  : deploy_path,
+            'has_artifacts': bool(deploy_path and Path(deploy_path).exists()),
+        }
+        if deploy_path:
+            build['logs'].append(f"[NEXUS] ✓ Pipeline complete. Project saved → {deploy_path}")
+        else:
+            build['logs'].append("[NEXUS] ✓ Pipeline complete. (Deployment path not generated)")
 
     except Exception as exc:
         build['status'] = 'error'

@@ -577,6 +577,7 @@ class Orchestrator:
         # ── Final Master Summary ───────────────────────────────────── #
 
         self._final_summary(project, task_id)
+        return project
 
     # ------------------------------------------------------------------ #
     # Final Summary                                                        #

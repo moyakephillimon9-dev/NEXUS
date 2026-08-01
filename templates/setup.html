@@ -21,6 +21,52 @@
       font-size: 13px; color: #80e8ff; line-height: 1.6;
     }
     .setup-banner strong { color: var(--blue); }
+
+    /* Phone OTP widget */
+    .phone-row { display: flex; gap: 10px; align-items: flex-end; }
+    .phone-row .form-group { flex: 1; }
+    .send-otp-btn {
+      flex-shrink: 0; padding: 0 18px; height: 44px;
+      background: rgba(0,212,255,0.1); border: 1px solid var(--blue-border);
+      color: var(--blue); border-radius: 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    }
+    .send-otp-btn:hover:not(:disabled) { background: rgba(0,212,255,0.2); }
+    .send-otp-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .otp-row {
+      display: none; gap: 10px; align-items: flex-end; margin-top: 12px;
+    }
+    .otp-row.visible { display: flex; }
+    .otp-input {
+      letter-spacing: 8px; font-size: 20px; font-weight: 700;
+      text-align: center;
+    }
+    .verify-btn {
+      flex-shrink: 0; padding: 0 18px; height: 44px;
+      background: var(--blue); color: #000;
+      border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .verify-btn:hover:not(:disabled) { opacity: 0.85; }
+    .verify-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .phone-status {
+      font-size: 12px; margin-top: 6px; min-height: 18px; transition: all 0.2s;
+    }
+    .phone-status.ok  { color: var(--green, #00ff88); }
+    .phone-status.err { color: #ff4d6d; }
+    .phone-status.info{ color: var(--blue); }
+
+    .verified-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3);
+      color: #00ff88; border-radius: 99px; padding: 3px 10px; font-size: 11px;
+      font-weight: 600; margin-top: 6px;
+    }
+
+    /* Countdown */
+    #otp-countdown { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -30,7 +76,7 @@
 
     <!-- Logo -->
     <div class="auth-logo">
-      <div class="auth-logo-icon">⚡</div>
+      <img src="{{ url_for('static', filename='img/nexus-mark.svg') }}" class="auth-logo-icon" alt="NEXUS">
       <div class="auth-logo-text">
         <div class="auth-logo-title" style="letter-spacing:3px">NEXUS</div>
         <div class="auth-logo-sub">AI Operating System</div>
@@ -39,10 +85,10 @@
 
     <!-- Progress dots -->
     <div class="setup-steps">
-      <div class="step active"></div>
-      <div class="step"></div>
-      <div class="step"></div>
-      <div class="step"></div>
+      <div class="step active" id="dot1"></div>
+      <div class="step" id="dot2"></div>
+      <div class="step" id="dot3"></div>
+      <div class="step" id="dot4"></div>
     </div>
 
     <div class="auth-heading">Welcome, Founder.</div>
@@ -60,7 +106,7 @@
       Your credentials are encrypted and stored locally.
     </div>
 
-    <form method="POST" action="{{ url_for('setup') }}">
+    <form method="POST" action="{{ url_for('setup') }}" id="setup-form">
 
       <div class="form-row">
         <div class="form-group">
@@ -73,18 +119,49 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Email Address *</label>
-          <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Phone Number</label>
-          <input type="tel" name="phone" class="form-input" placeholder="+1 000 000 0000">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Email Address *</label>
+        <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required>
       </div>
 
-      <div class="form-row">
+      <!-- Phone + OTP verification -->
+      <div class="form-group" style="margin-top:16px;">
+        <label class="form-label">
+          Phone Number
+          <span id="verified-badge" class="verified-badge" style="display:none;">✓ Verified</span>
+        </label>
+
+        <div class="phone-row">
+          <div class="form-group" style="margin:0;flex:1;">
+            <input type="tel" name="phone" id="phone-input" class="form-input"
+              placeholder="+1 000 000 0000"
+              oninput="onPhoneChange()">
+          </div>
+          <button type="button" class="send-otp-btn" id="send-otp-btn"
+            onclick="sendOTP()" disabled>
+            Send Code
+          </button>
+        </div>
+
+        <!-- OTP entry row -->
+        <div class="otp-row" id="otp-row">
+          <div class="form-group" style="margin:0;flex:1;">
+            <input type="text" id="otp-input" class="form-input otp-input"
+              maxlength="6" placeholder="——————"
+              oninput="onOtpInput(this)">
+          </div>
+          <button type="button" class="verify-btn" id="verify-btn"
+            onclick="verifyOTP()" disabled>
+            Verify
+          </button>
+        </div>
+
+        <div class="phone-status" id="phone-status"></div>
+        <!-- Hidden field to pass verified phone to backend -->
+        <input type="hidden" name="phone_verified" id="phone-verified-flag" value="0">
+      </div>
+
+      <div class="form-row" style="margin-top:16px;">
         <div class="form-group">
           <label class="form-label">Country</label>
           <input type="text" name="country" class="form-input" placeholder="South Africa">
@@ -123,6 +200,128 @@
 
   </div>
 </div>
+
+<script>
+let otpSent      = false;
+let phoneVerified = false;
+let countdown    = null;
+
+function onPhoneChange() {
+  const val = document.getElementById('phone-input').value.trim();
+  const btn = document.getElementById('send-otp-btn');
+  btn.disabled = val.length < 7;
+  // Reset verification if phone changes
+  if (otpSent || phoneVerified) {
+    otpSent = false;
+    phoneVerified = false;
+    document.getElementById('otp-row').classList.remove('visible');
+    document.getElementById('phone-verified-flag').value = '0';
+    document.getElementById('verified-badge').style.display = 'none';
+    setStatus('', '');
+  }
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('phone-status');
+  el.textContent = msg;
+  el.className   = 'phone-status ' + (type || '');
+}
+
+async function sendOTP() {
+  const phone = document.getElementById('phone-input').value.trim();
+  if (!phone) return;
+
+  const btn = document.getElementById('send-otp-btn');
+  btn.disabled   = true;
+  btn.textContent = 'Sending…';
+  setStatus('Sending code…', 'info');
+
+  try {
+    const res  = await fetch('/api/phone/send-otp', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ phone }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      otpSent = true;
+      document.getElementById('otp-row').classList.add('visible');
+      document.getElementById('otp-input').focus();
+      setStatus('Code sent! Check your SMS.', 'ok');
+      startCountdown(btn, 60);
+    } else {
+      setStatus('⚠ ' + data.error, 'err');
+      btn.disabled    = false;
+      btn.textContent = 'Send Code';
+    }
+  } catch (e) {
+    setStatus('⚠ Network error. Try again.', 'err');
+    btn.disabled    = false;
+    btn.textContent = 'Send Code';
+  }
+}
+
+function startCountdown(btn, secs) {
+  if (countdown) clearInterval(countdown);
+  let s = secs;
+  btn.textContent = `Resend (${s}s)`;
+  countdown = setInterval(() => {
+    s--;
+    if (s <= 0) {
+      clearInterval(countdown);
+      btn.disabled    = false;
+      btn.textContent = 'Resend Code';
+    } else {
+      btn.textContent = `Resend (${s}s)`;
+    }
+  }, 1000);
+}
+
+function onOtpInput(el) {
+  // Only allow digits
+  el.value = el.value.replace(/\D/g, '');
+  document.getElementById('verify-btn').disabled = el.value.length < 6;
+}
+
+async function verifyOTP() {
+  const phone = document.getElementById('phone-input').value.trim();
+  const code  = document.getElementById('otp-input').value.trim();
+  if (!phone || code.length < 6) return;
+
+  const btn      = document.getElementById('verify-btn');
+  btn.disabled   = true;
+  btn.textContent = 'Verifying…';
+  setStatus('Verifying…', 'info');
+
+  try {
+    const res  = await fetch('/api/phone/verify-otp', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ phone, code }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      phoneVerified = true;
+      document.getElementById('phone-verified-flag').value = '1';
+      document.getElementById('otp-row').classList.remove('visible');
+      document.getElementById('verified-badge').style.display = 'inline-flex';
+      setStatus('✓ Phone number verified!', 'ok');
+      if (countdown) clearInterval(countdown);
+    } else {
+      setStatus('⚠ ' + data.error, 'err');
+      btn.disabled    = false;
+      btn.textContent = 'Verify';
+    }
+  } catch (e) {
+    setStatus('⚠ Network error.', 'err');
+    btn.disabled    = false;
+    btn.textContent = 'Verify';
+  }
+}
+</script>
+
 <script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
 </body>
 </html>

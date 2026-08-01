@@ -64,7 +64,7 @@ class OwnerManager:
             return {'success': False, 'error': 'No owner found.'}
         with open(self._owner_file) as f:
             owner = json.load(f)
-        safe_keys = {'full_name', 'phone', 'company', 'country', 'timezone'}
+        safe_keys = {'full_name', 'phone', 'phone_verified', 'company', 'country', 'timezone'}
         for k, v in updates.items():
             if k in safe_keys:
                 owner[k] = v

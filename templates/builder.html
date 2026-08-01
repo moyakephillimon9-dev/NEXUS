@@ -7,7 +7,7 @@
 <div class="section-header mb-24">
   <div>
     <div class="section-title">NEXUS Builder</div>
-    <div class="section-sub">Describe what you want — NEXUS runs the 21-stage pipeline automatically</div>
+    <div class="section-sub">Describe what you want — NEXUS runs the 21-stage pipeline and delivers a real, downloadable project</div>
   </div>
 </div>
 
@@ -37,7 +37,7 @@
 </div>
 
 <!-- Build form -->
-<div class="card mb-24">
+<div class="card mb-24" id="build-form-card">
   <div class="card-title mb-16">Describe Your Goal</div>
   <form id="build-form">
     <div class="form-group">
@@ -60,38 +60,55 @@
         <input type="text" id="build-features" class="form-input" placeholder="e.g. Login, dashboard, notifications…">
       </div>
     </div>
-    <div class="flex gap-12 mt-8">
-      <button type="submit" id="build-btn" class="btn btn-primary btn-lg">
-        ⚡ Start Pipeline
-      </button>
-      <div style="flex:1;display:flex;align-items:center;gap:12px;" id="build-progress-wrap" style="display:none;">
-        <div style="flex:1;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-            <span style="font-size:12px;color:var(--text-muted);" id="build-stage-label">Initializing…</span>
-            <span style="font-size:12px;font-weight:600;color:var(--blue);" id="build-pct">0%</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" id="build-progress-bar" style="width:0%"></div></div>
-        </div>
-      </div>
-    </div>
+    <button type="submit" id="build-btn" class="btn btn-primary btn-lg mt-8">
+      ⚡ Start Pipeline
+    </button>
   </form>
 </div>
 
-<!-- Console -->
-<div id="build-progress-wrap" style="display:none;" class="card">
-  <div class="section-header mb-12">
-    <div class="card-title">Pipeline Console</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:12px;color:var(--text-muted);" id="build-stage-label">—</span>
-      <span style="font-size:13px;font-weight:700;color:var(--blue);" id="build-pct">0%</span>
-    </div>
-    <div class="progress-bar" style="margin-bottom:16px;">
-      <div class="progress-fill" id="build-progress-bar" style="width:0%"></div>
-    </div>
+<!-- Pipeline Console (hidden until build starts) -->
+<div id="pipeline-console-card" class="card mb-24" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="card-title" style="margin:0;">Pipeline Console</div>
+    <span id="build-status-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:rgba(0,212,255,0.1);color:var(--blue);">RUNNING</span>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:12px;color:var(--text-muted);" id="build-stage-label">Initializing…</span>
+    <span style="font-size:13px;font-weight:700;color:var(--blue);" id="build-pct">0%</span>
+  </div>
+  <div class="progress-bar" style="margin-bottom:16px;">
+    <div class="progress-fill" id="build-progress-bar" style="width:0%"></div>
   </div>
   <div class="build-console" id="build-console">
-    <span class="log-line" style="color:var(--text-muted);">[NEXUS] Waiting for input…</span>
+    <span class="log-line" style="color:var(--text-muted);">[NEXUS] Awaiting pipeline…</span>
   </div>
+</div>
+
+<!-- Result card (hidden until complete) -->
+<div id="build-result-card" class="card mb-24" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div>
+      <div class="card-title" style="color:var(--green, #00ff88);margin-bottom:4px;">✓ Project Built</div>
+      <div style="font-size:12px;color:var(--text-muted);" id="result-meta">—</div>
+    </div>
+    <a id="download-btn" href="#" class="btn btn-primary" style="display:none;">
+      ⬇ Download Project (.zip)
+    </a>
+  </div>
+
+  <!-- File tree -->
+  <div id="file-tree-wrap" style="display:none;">
+    <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Generated Files</div>
+    <div id="file-tree" style="display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+
+  <div id="no-artifacts-msg" style="display:none;font-size:13px;color:var(--text-muted);padding:12px 0;">
+    Pipeline ran successfully but the Deployment AI did not generate downloadable files for this project type.
+  </div>
+
+  <button onclick="resetBuilder()" class="btn btn-ghost mt-16" style="font-size:13px;">
+    ↩ Build Another Project
+  </button>
 </div>
 
 <!-- Pipeline overview -->
@@ -122,7 +139,7 @@
       ('20','Memory AI',           'Saves to memory'),
     ] %}
     {% for num, name, desc in stages %}
-    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:12px 14px;" id="stage-tile-{{ num }}">
       <div style="font-size:10px;color:var(--blue);font-weight:700;margin-bottom:4px;">Stage {{ num }}</div>
       <div style="font-size:13px;font-weight:600;">{{ name }}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ desc }}</div>
@@ -132,11 +149,172 @@
 </div>
 
 <script>
+let currentTaskId = null;
+let pollTimer     = null;
+
 function selectType(el, name) {
   document.querySelectorAll('.build-type').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
   const goal = document.getElementById('build-goal');
   if (goal) goal.placeholder = `Describe your ${name} in detail…`;
+}
+
+document.getElementById('build-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  let goal = document.getElementById('build-goal').value.trim();
+  const users    = document.getElementById('build-users').value.trim();
+  const features = document.getElementById('build-features').value.trim();
+  if (users)    goal += `\nTarget Users: ${users}`;
+  if (features) goal += `\nKey Features: ${features}`;
+
+  if (!goal) return;
+
+  // UI switch
+  document.getElementById('build-form-card').style.display = 'none';
+  document.getElementById('pipeline-console-card').style.display = 'block';
+  document.getElementById('build-result-card').style.display = 'none';
+  logLine('[NEXUS] Submitting goal to pipeline…');
+
+  try {
+    const res  = await fetch('/api/build', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ goal }),
+    });
+    const data = await res.json();
+    if (data.task_id) {
+      currentTaskId = data.task_id;
+      pollTimer = setInterval(pollStatus, 1500);
+    } else {
+      logLine('[ERROR] ' + (data.error || 'Failed to start pipeline.'));
+    }
+  } catch (err) {
+    logLine('[ERROR] Network error: ' + err.message);
+  }
+});
+
+async function pollStatus() {
+  if (!currentTaskId) return;
+  try {
+    const res  = await fetch(`/api/build/${currentTaskId}/status`);
+    const data = await res.json();
+
+    // Progress bar
+    document.getElementById('build-progress-bar').style.width = (data.progress || 0) + '%';
+    document.getElementById('build-pct').textContent           = (data.progress || 0) + '%';
+    document.getElementById('build-stage-label').textContent   = data.stage || '—';
+
+    // Highlight current stage tile
+    if (data.stage_idx !== undefined) {
+      document.querySelectorAll('[id^="stage-tile-"]').forEach(t => t.style.borderColor = '');
+      const tile = document.getElementById('stage-tile-' + data.stage_idx);
+      if (tile) tile.style.borderColor = 'var(--blue)';
+    }
+
+    // New log lines
+    if (Array.isArray(data.logs)) {
+      const console_ = document.getElementById('build-console');
+      const existing = console_.querySelectorAll('.log-line').length;
+      for (let i = existing; i < data.logs.length; i++) {
+        logLine(data.logs[i]);
+      }
+    }
+
+    if (data.status === 'complete') {
+      clearInterval(pollTimer);
+      document.getElementById('build-status-badge').textContent = 'COMPLETE';
+      document.getElementById('build-status-badge').style.background = 'rgba(0,255,136,0.1)';
+      document.getElementById('build-status-badge').style.color = '#00ff88';
+      await showResult(data);
+    } else if (data.status === 'error') {
+      clearInterval(pollTimer);
+      document.getElementById('build-status-badge').textContent = 'ERROR';
+      document.getElementById('build-status-badge').style.background = 'rgba(255,77,109,0.1)';
+      document.getElementById('build-status-badge').style.color = '#ff4d6d';
+      logLine('[ERROR] ' + (data.error || 'Pipeline failed.'));
+    }
+  } catch (err) {
+    // transient network error — keep polling
+  }
+}
+
+async function showResult(data) {
+  document.getElementById('build-result-card').style.display = 'block';
+
+  const result = data.result || {};
+  document.getElementById('result-meta').textContent =
+    `Framework: ${result.framework || '?'}  •  Language: ${result.language || '?'}`;
+
+  if (result.has_artifacts && currentTaskId) {
+    // Show download button
+    const dlBtn = document.getElementById('download-btn');
+    dlBtn.href  = `/api/build/${currentTaskId}/download`;
+    dlBtn.style.display = 'inline-flex';
+
+    // Load file tree
+    try {
+      const fr   = await fetch(`/api/build/${currentTaskId}/files`);
+      const fdata = await fr.json();
+      if (fdata.files && fdata.files.length > 0) {
+        document.getElementById('file-tree-wrap').style.display = 'block';
+        const tree = document.getElementById('file-tree');
+        tree.innerHTML = '';
+        fdata.files.forEach(f => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg-input);border-radius:8px;font-size:12px;';
+          const name = document.createElement('span');
+          name.style.color = '#cdd6f4';
+          name.textContent = '📄 ' + f.name;
+          const size = document.createElement('span');
+          size.style.color = 'var(--text-muted)';
+          size.textContent = formatBytes(f.size);
+          row.appendChild(name);
+          row.appendChild(size);
+          tree.appendChild(row);
+        });
+      }
+    } catch (_) {}
+  } else {
+    document.getElementById('no-artifacts-msg').style.display = 'block';
+  }
+}
+
+function logLine(msg) {
+  const c = document.getElementById('build-console');
+  // Clear placeholder
+  const placeholder = c.querySelector('.log-line[style*="text-muted"]');
+  if (placeholder && placeholder.textContent.includes('Awaiting')) placeholder.remove();
+
+  const span = document.createElement('span');
+  span.className   = 'log-line';
+  span.textContent = msg;
+  if (msg.startsWith('[ERROR]')) span.style.color = '#ff4d6d';
+  else if (msg.includes('✓'))   span.style.color = '#00ff88';
+  c.appendChild(span);
+  c.scrollTop = c.scrollHeight;
+}
+
+function formatBytes(b) {
+  if (b < 1024)         return b + ' B';
+  if (b < 1024 * 1024)  return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function resetBuilder() {
+  currentTaskId = null;
+  if (pollTimer) clearInterval(pollTimer);
+  document.getElementById('build-form-card').style.display    = 'block';
+  document.getElementById('pipeline-console-card').style.display = 'none';
+  document.getElementById('build-result-card').style.display  = 'none';
+  document.getElementById('build-console').innerHTML = '<span class="log-line" style="color:var(--text-muted);">[NEXUS] Awaiting pipeline…</span>';
+  document.getElementById('build-progress-bar').style.width   = '0%';
+  document.getElementById('build-pct').textContent            = '0%';
+  document.getElementById('build-stage-label').textContent    = 'Initializing…';
+  document.getElementById('build-status-badge').textContent   = 'RUNNING';
+  document.getElementById('build-status-badge').style.background = 'rgba(0,212,255,0.1)';
+  document.getElementById('build-status-badge').style.color   = 'var(--blue)';
+  document.querySelectorAll('[id^="stage-tile-"]').forEach(t => t.style.borderColor = '');
 }
 </script>
 {% endblock %}

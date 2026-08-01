@@ -1,0 +1,30 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nx-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#8A2BE2"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- N shape: two verticals + diagonal -->
+  <polygon
+    points="4,40 4,8 9,8 9,30 19,8 24,8 24,40 19,40 19,18 9,40"
+    fill="url(#nx-grad)" filter="url(#glow)"/>
+
+  <!-- X shape: two crossing bars -->
+  <!-- top-left → bottom-right -->
+  <polygon
+    points="27,8 32,8 44,40 39,40"
+    fill="url(#nx-grad)" filter="url(#glow)"/>
+  <!-- top-right → bottom-left -->
+  <polygon
+    points="44,8 39,8 27,40 32,40"
+    fill="url(#nx-grad)" filter="url(#glow)"/>
+
+  <!-- Central highlight dot -->
+  <circle cx="35.5" cy="24" r="2.5" fill="#00D4FF" opacity="0.8"/>
+</svg>

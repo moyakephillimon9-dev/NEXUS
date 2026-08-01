@@ -104,6 +104,53 @@
     </div>
   </div>
 
+  <!-- Phone Verification -->
+  <div class="card">
+    <div class="card-title mb-4">📱 Phone Verification</div>
+    <div class="card-subtitle mb-20">Verify your phone number via SMS for added security</div>
+
+    {% if owner.get('phone_verified') %}
+    <div class="alert alert-success mb-16">
+      <span>✓</span> Phone <strong>{{ owner.get('phone','') }}</strong> is verified.
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px;">
+      <div class="form-group" style="flex:1;margin:0;">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" id="settings-phone" class="form-input"
+          value="{{ owner.get('phone','') }}"
+          placeholder="+1 000 000 0000">
+      </div>
+      <button type="button" class="btn" id="settings-send-btn"
+        onclick="settingsSendOTP()"
+        style="height:44px;padding:0 18px;background:rgba(0,212,255,0.1);border:1px solid var(--blue-border);color:var(--blue);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        Send Code
+      </button>
+    </div>
+
+    <div id="settings-otp-row" style="display:none;display:none;gap:10px;align-items:flex-end;margin-bottom:10px;">
+      <div class="form-group" style="flex:1;margin:0;">
+        <input type="text" id="settings-otp-input" class="form-input"
+          maxlength="6" placeholder="6-digit code"
+          style="letter-spacing:6px;font-size:18px;font-weight:700;text-align:center;"
+          oninput="this.value=this.value.replace(/\D/g,'');document.getElementById('settings-verify-btn').disabled=this.value.length<6;">
+      </div>
+      <button type="button" id="settings-verify-btn"
+        onclick="settingsVerifyOTP()" disabled
+        style="height:44px;padding:0 18px;background:var(--blue);color:#000;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
+        Verify
+      </button>
+    </div>
+
+    <div id="settings-phone-status" style="font-size:12px;min-height:18px;"></div>
+
+    <div class="alert alert-info mt-12">
+      <span>ℹ</span>
+      <div>Requires <strong>TWILIO_ACCOUNT_SID</strong>, <strong>TWILIO_AUTH_TOKEN</strong>, and <strong>TWILIO_PHONE_NUMBER</strong> in Replit Secrets.</div>
+    </div>
+  </div>
+
   <!-- Security note -->
   <div class="card">
     <div class="card-title mb-4">🔐 Security</div>
@@ -125,4 +172,66 @@
 
 </div>
 </form>
+
+<script>
+let settingsOtpSent = false;
+
+async function settingsSendOTP() {
+  const phone = document.getElementById('settings-phone').value.trim();
+  if (!phone) { setSettingsStatus('Enter a phone number first.', 'err'); return; }
+
+  const btn = document.getElementById('settings-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  setSettingsStatus('Sending code…', 'info');
+
+  const res  = await fetch('/api/phone/send-otp-auth', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ phone })
+  });
+  const data = await res.json();
+  if (data.success) {
+    settingsOtpSent = true;
+    document.getElementById('settings-otp-row').style.display = 'flex';
+    document.getElementById('settings-otp-input').focus();
+    setSettingsStatus('Code sent! Check your SMS.', 'ok');
+    let s = 60;
+    const iv = setInterval(() => {
+      s--;
+      if (s <= 0) { clearInterval(iv); btn.disabled=false; btn.textContent='Resend Code'; }
+      else btn.textContent = `Resend (${s}s)`;
+    }, 1000);
+  } else {
+    setSettingsStatus('⚠ ' + data.error, 'err');
+    btn.disabled = false; btn.textContent = 'Send Code';
+  }
+}
+
+async function settingsVerifyOTP() {
+  const phone = document.getElementById('settings-phone').value.trim();
+  const code  = document.getElementById('settings-otp-input').value.trim();
+  const btn   = document.getElementById('settings-verify-btn');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  setSettingsStatus('Verifying…', 'info');
+
+  const res  = await fetch('/api/phone/verify-otp-auth', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ phone, code })
+  });
+  const data = await res.json();
+  if (data.success) {
+    setSettingsStatus('✓ Phone verified!', 'ok');
+    document.getElementById('settings-otp-row').style.display = 'none';
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    setSettingsStatus('⚠ ' + data.error, 'err');
+    btn.disabled = false; btn.textContent = 'Verify';
+  }
+}
+
+function setSettingsStatus(msg, type) {
+  const el = document.getElementById('settings-phone-status');
+  el.textContent = msg;
+  el.style.color = type==='ok' ? '#00ff88' : type==='err' ? '#ff4d6d' : 'var(--blue)';
+}
+</script>
 {% endblock %}

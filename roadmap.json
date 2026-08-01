@@ -1,123 +1,203 @@
 {
   "version": "0.1.0",
   "project": "NEXUS",
-  "description": "AI Operating System — Full Roadmap",
+  "subtitle": "AI Operating System",
+  "owner": "Moyake Phillimon",
+  "description": "Complete roadmap from Foundation to full AI Operating System",
   "last_updated": "2026-07-30",
+  "honesty_note": "Pipeline execution %, feature coverage %, and roadmap progress % are always reported separately. They are never merged into one misleading number.",
+  "current_version": {
+    "number": "0.1.0",
+    "name": "Foundation Release",
+    "pipeline_execution_pct": 100,
+    "feature_coverage_pct": 12,
+    "roadmap_progress_pct": 8
+  },
   "milestones": [
     {
       "version": "0.1.0",
       "name": "Foundation Release",
       "status": "complete",
       "released": "2026-07-30",
-      "description": "Core platform with web UI, authentication, dashboard, chat, builder, workers, memory, reports and settings.",
-      "features": [
-        "Owner authentication and first-time setup",
-        "Owner dashboard with stats and cards",
-        "Chat with NEXUS (built-in reasoning engine)",
-        "Project Builder (21-stage pipeline)",
-        "AI Worker Manager (22 workers)",
-        "Memory system and timeline",
-        "Reports (daily/weekly)",
-        "Settings (AI provider, security)",
-        "Plugin architecture",
-        "Roadmap system"
+      "description": "Core platform with web UI, owner authentication, dashboard, chat (built-in engine), project builder, 21-stage pipeline, AI worker manager, memory timeline, reports, settings, roadmap, and full design system.",
+      "what_is_implemented": [
+        "Owner first-time setup with encrypted credentials",
+        "Owner login (SHA-256 + salt, session-based)",
+        "Dashboard with live stats and quick launch",
+        "Chat with NEXUS — built-in pattern-matching engine, SSE streaming",
+        "Project Builder with 21-stage pipeline and live console",
+        "AI Workers page — all 22 agents, CPU/memory metrics",
+        "Memory timeline from knowledge database",
+        "Reports with pipeline stats and system health",
+        "Settings: AI provider (built-in / OpenRouter / Ollama / LM Studio)",
+        "Roadmap page",
+        "NEXUS brand design system: #00D4FF + #8A2BE2",
+        "NX SVG logo mark",
+        "Circuit board background texture",
+        "Holographic card borders",
+        "Gradient animations",
+        "Design docs: UI_DESIGN.md, COMPONENT_MAP.md, SCREEN_FLOW.md, THEME_SYSTEM.md, ANIMATION_SYSTEM.md",
+        "All references renamed NEXUS_BUILDER → NEXUS",
+        "GitHub auto-push on every milestone"
+      ],
+      "what_is_NOT_implemented": [
+        "Real LLM calls in pipeline stages (stubs/templates only)",
+        "Voice interface",
+        "2FA authentication",
+        "Financial management",
+        "Social media management",
+        "Mobile app generation",
+        "Project detail page",
+        "Notifications",
+        "Splash screen animation"
       ]
     },
     {
       "version": "0.2.0",
-      "name": "LLM Integration",
+      "name": "Real Intelligence",
       "status": "planned",
       "target": "2026-Q3",
-      "description": "Connect real LLM providers for genuine AI responses in all 21 pipeline stages.",
+      "description": "Connect real LLM providers so every pipeline stage produces genuine, goal-specific code, architecture and documentation.",
       "features": [
-        "OpenRouter integration",
-        "Ollama (local) integration",
-        "LM Studio integration",
-        "Streaming responses from real LLM",
-        "Model selection per worker",
-        "Token usage tracking"
+        "OpenRouter API integration (OPENROUTER_API_KEY via Replit Secrets)",
+        "Ollama local model integration",
+        "LM Studio local model integration",
+        "Streaming LLM responses in chat",
+        "Each of 21 pipeline workers uses real LLM",
+        "Token usage tracking in Reports",
+        "Model selector per worker in Settings",
+        "Two-factor authentication (TOTP + QR code)",
+        "Project detail page with full pipeline output",
+        "Pipeline visualisation with animated stage flow"
       ]
     },
     {
       "version": "0.3.0",
-      "name": "Voice Interface",
+      "name": "Voice & Presence",
       "status": "planned",
       "target": "2026-Q4",
-      "description": "Talk to NEXUS with voice commands and hear spoken responses.",
+      "description": "NEXUS comes alive with voice input, spoken responses and the animated splash screen from the brand sheet.",
       "features": [
-        "Speech-to-text input",
-        "Text-to-speech output",
-        "Voice pipeline commands",
-        "Wake-word activation"
+        "Web Speech API — speech to text in chat",
+        "SpeechSynthesis — NEXUS speaks responses",
+        "Real-time audio waveform (matches brand sheet design)",
+        "Wake-word detection (browser-based)",
+        "Animated splash screen on first load",
+        "Voice toggle in Settings",
+        "Listening animation on mic activation",
+        "Dark/Light/Stealth theme switching"
       ]
     },
     {
       "version": "0.4.0",
-      "name": "Mobile & Desktop App Creation",
+      "name": "Build Anything",
       "status": "planned",
       "target": "2027-Q1",
-      "description": "NEXUS can generate Android, iOS and desktop applications.",
+      "description": "NEXUS generates Android, iOS, desktop and game projects — not just web apps.",
       "features": [
-        "Android app generation",
-        "iOS app generation (Flutter)",
-        "Desktop app generation (Electron)",
-        "App store deployment guidance"
+        "Android app generation (Java/Kotlin templates)",
+        "iOS app generation (Flutter/Swift templates)",
+        "Desktop app generation (Electron/Tauri templates)",
+        "Game project scaffolding (Pygame, Unity exports)",
+        "App store deployment guidance",
+        "Project digital twin system (architecture + code + docs saved together)",
+        "Version history per project",
+        "Builder approval gate before deployment"
       ]
     },
     {
       "version": "0.5.0",
-      "name": "Financial Management",
+      "name": "Financial Intelligence",
       "status": "future",
       "target": "2027-Q2",
-      "description": "Track income, expenses, transactions and generate financial reports.",
+      "description": "Track, analyse and report on all revenue streams. Every financial action requires Founder approval.",
       "features": [
-        "Income tracking",
-        "Expense management",
+        "Income and expense tracking",
         "Transaction history",
-        "Revenue forecasting",
-        "Financial reports",
-        "Requires Founder approval for all financial actions"
+        "Revenue source categorisation (apps, websites, subscriptions)",
+        "Financial forecast reports",
+        "Executive finance dashboard",
+        "Bank details stored encrypted (never in git)",
+        "Founder approval required for ALL financial actions",
+        "Daily/weekly/monthly automated financial reports"
       ]
     },
     {
       "version": "0.6.0",
-      "name": "Social Media Management",
+      "name": "Social Media Command",
       "status": "future",
       "target": "2027-Q3",
-      "description": "Manage Facebook, Instagram, TikTok, YouTube, X, LinkedIn and more.",
+      "description": "Manage Facebook, Instagram, TikTok, YouTube, X, LinkedIn, WhatsApp Business and more — always with Founder approval.",
       "features": [
-        "Post scheduling and creation",
+        "Post creation and scheduling",
         "Caption and hashtag generation",
         "Engagement analytics",
-        "Requires Founder approval for every action"
+        "Comment monitoring",
+        "AI-generated poster images",
+        "Every post/action requires explicit Founder approval",
+        "Never assumes monetisation — reports only verified earnings"
       ]
     },
     {
       "version": "0.7.0",
-      "name": "Marketing & Advertising",
+      "name": "Marketing Engine",
       "status": "future",
       "target": "2027-Q4",
-      "description": "Create full marketing campaigns with posters, videos and ad copy.",
+      "description": "Full marketing campaign creation with AI-generated visuals, videos and ad copy.",
       "features": [
         "AI poster generation",
-        "AI video creation",
+        "AI advert video creation",
         "Ad copy writing",
-        "Campaign performance estimation"
+        "Campaign performance estimation",
+        "Campaign scheduling",
+        "All campaigns require Founder approval before publishing"
+      ]
+    },
+    {
+      "version": "0.8.0",
+      "name": "Customer Intelligence",
+      "status": "future",
+      "target": "2028-Q1",
+      "description": "NEXUS reads, categorises and acts on customer feedback, reviews and support requests.",
+      "features": [
+        "Customer feedback analysis",
+        "Review categorisation (bugs, features, complaints)",
+        "Support ticket management",
+        "Automated improvement reports",
+        "Email and chat management (Founder-approved replies only)"
       ]
     },
     {
       "version": "1.0.0",
       "name": "Full AI Operating System",
       "status": "future",
-      "target": "2028-Q1",
-      "description": "Complete AI OS: builds, manages, markets and monetises the Founder's digital empire.",
+      "target": "2028-Q2",
+      "description": "The complete vision: NEXUS manages the Founder's entire digital empire — software, business, finance, marketing, customers — all under one private, intelligent platform.",
       "features": [
-        "All v0.x features combined",
-        "Customer management",
-        "App ecosystem management",
-        "Digital twin system",
-        "Automated business reporting",
-        "Self-improvement with Founder approval"
+        "All v0.x features unified",
+        "App ecosystem management (every app NEXUS ever built)",
+        "Digital twin for every project",
+        "Self-improvement proposals (always Founder-approved)",
+        "Global business management",
+        "Plugin marketplace (community extensions)",
+        "NEXUS official website maintenance",
+        "Automated daily/weekly/monthly reporting across all domains"
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "name": "Beyond Screens",
+      "status": "future",
+      "target": "2029+",
+      "description": "Expansion into robotics, smart home, AR/VR and IoT — NEXUS as a physical world operating system.",
+      "features": [
+        "Robotics integration",
+        "Smart home automation",
+        "Vehicle integration",
+        "AR/VR interface",
+        "IoT device management",
+        "AI research coordination",
+        "Satellite and space technology monitoring"
       ]
     }
   ]

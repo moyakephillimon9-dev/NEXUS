@@ -11,7 +11,7 @@
 
     {% if not history %}
     <div id="chat-welcome" class="chat-welcome">
-      <div class="chat-welcome-icon">⚡</div>
+      <img src="{{ url_for('static', filename='img/nexus-mark.svg') }}" class="chat-welcome-logo" alt="NEXUS">
       <h2>How can I help you today?</h2>
       <p>I'm NEXUS, your AI Operating System. Ask me anything about your projects, workers, or what to build next.</p>
       <div class="chat-suggestions">
