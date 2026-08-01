@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Revenue{% endblock %}
+{% block page_title %}Revenue{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">Revenue Dashboard</div>
+    <div class="section-sub">Ad earnings · App sales · Subscriptions — all in one place</div>
+  </div>
+  <button onclick="document.getElementById('add-revenue-modal').style.display='flex'" class="btn btn-primary btn-sm">
+    + Log Revenue
+  </button>
+</div>
+
+<!-- Summary stats -->
+<div class="stats-grid mb-24">
+  <div class="stat-card" style="border-color:rgba(138,43,226,0.3);">
+    <div class="stat-icon" style="background:rgba(138,43,226,0.15);font-size:22px;">💰</div>
+    <div>
+      <div class="stat-value" style="color:#c084fc;">${{ '%.2f'|format(summary.total_usd) }}</div>
+      <div class="stat-label">Total Earned</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green" style="font-size:20px;">📈</div>
+    <div>
+      <div class="stat-value">${{ '%.2f'|format(summary.this_month_usd) }}</div>
+      <div class="stat-label">This Month</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon blue" style="font-size:20px;">📋</div>
+    <div>
+      <div class="stat-value">{{ summary.entry_count }}</div>
+      <div class="stat-label">Transactions</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon yellow" style="font-size:20px;">🎯</div>
+    <div>
+      <div class="stat-value">${{ '%.0f'|format(revenue.get('alert_threshold', 100)) }}</div>
+      <div class="stat-label">SMS Alert At</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 mb-24">
+
+  <!-- Revenue by source -->
+  <div class="card">
+    <div class="card-title mb-16">By Source</div>
+    {% if summary.by_source %}
+      {% for source, amount in summary.by_source.items() %}
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+          <span style="font-size:13px;font-weight:500;text-transform:capitalize;">{{ source }}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--cyan);">${{ '%.2f'|format(amount) }}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:{{ [((amount / (summary.total_usd or 1)) * 100)|int, 100]|min }}%;background:var(--gradient-h);"></div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state" style="padding:24px 0;">
+        <div class="empty-state-icon">📊</div>
+        <h3>No revenue yet</h3>
+        <p>Log your first entry to see breakdowns here.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Connect revenue sources -->
+  <div class="card">
+    <div class="card-title mb-16">Connect Revenue Sources</div>
+    {% set sources = [
+      ('💰','Google AdSense','Ad earnings from your web apps','adsense'),
+      ('🤖','Google Play','App sales & in-app purchases','play'),
+      ('🍎','App Store Connect','iOS app sales','appstore'),
+      ('💳','Stripe','Subscriptions & payments','stripe'),
+    ] %}
+    {% for icon, name, desc, sid in sources %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;gap:12px;align-items:center;">
+        <span style="font-size:22px;">{{ icon }}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;">{{ name }}</div>
+          <div style="font-size:11px;color:var(--text-muted);">{{ desc }}</div>
+        </div>
+      </div>
+      <button onclick="connectSource('{{ sid }}')" class="btn btn-sm"
+        style="background:rgba(0,212,255,0.08);border:1px solid var(--cyan-border);color:var(--cyan);font-size:11px;">
+        Connect
+      </button>
+    </div>
+    {% endfor %}
+    <div class="alert alert-info mt-12" style="margin-bottom:0;">
+      <span>ℹ</span> Auto-sync coming in NEXUS v0.2. Log earnings manually until then.
+    </div>
+  </div>
+
+</div>
+
+<!-- SMS alert threshold -->
+<div class="card mb-24">
+  <div class="card-title mb-4">📲 SMS Payout Alerts</div>
+  <div class="card-subtitle mb-16">Get an SMS when you hit revenue milestones ($10, $50, $100, $500…)</div>
+  <div style="display:flex;gap:12px;align-items:flex-end;">
+    <div class="form-group" style="flex:1;margin:0;">
+      <label class="form-label">Custom alert threshold (USD)</label>
+      <input type="number" id="alert-threshold" class="form-input" min="1" step="1"
+        value="{{ revenue.get('alert_threshold', 100) }}" placeholder="100">
+    </div>
+    <button onclick="saveThreshold()" class="btn btn-primary" style="height:44px;padding:0 20px;">
+      Save
+    </button>
+    <span id="threshold-status" style="font-size:12px;align-self:center;"></span>
+  </div>
+</div>
+
+<!-- Transaction history -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="card-title" style="margin:0;">Transaction History</div>
+    <button onclick="exportCSV()" class="btn btn-ghost btn-sm">⬇ Export CSV</button>
+  </div>
+  {% if revenue.get('entries') %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border);">
+          <th style="padding:8px 12px;font-weight:600;">Date</th>
+          <th style="padding:8px 12px;font-weight:600;">Source</th>
+          <th style="padding:8px 12px;font-weight:600;">Note</th>
+          <th style="padding:8px 12px;font-weight:600;text-align:right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in revenue.get('entries', [])[:50] %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:10px 12px;color:var(--text-muted);">{{ e.date[:10] }}</td>
+          <td style="padding:10px 12px;text-transform:capitalize;">{{ e.source }}</td>
+          <td style="padding:10px 12px;color:var(--text-mid);">{{ e.note or '—' }}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;color:#00ff99;">${{ '%.2f'|format(e.amount_usd) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">💰</div>
+    <h3>No transactions yet</h3>
+    <p>Click "Log Revenue" to record your first earning.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Revenue Modal -->
+<div id="add-revenue-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border:1px solid var(--cyan-border);border-radius:20px;padding:32px;max-width:440px;width:90%;">
+    <div style="font-size:17px;font-weight:700;margin-bottom:20px;">💰 Log Revenue</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Amount (USD) *</label>
+        <input type="number" id="rev-amount" class="form-input" min="0.01" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source</label>
+        <select id="rev-source" class="form-select">
+          <option value="adsense">Google AdSense</option>
+          <option value="play_store">Google Play Store</option>
+          <option value="app_store">Apple App Store</option>
+          <option value="google_ads">Google Ads</option>
+          <option value="stripe">Stripe</option>
+          <option value="manual">Manual / Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note (optional)</label>
+      <input type="text" id="rev-note" class="form-input" placeholder="e.g. July AdSense payout">
+    </div>
+    <div id="rev-feedback" style="display:none;" class="alert mb-12"></div>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button onclick="logRevenue()" class="btn btn-primary" style="flex:1;">+ Log Entry</button>
+      <button onclick="document.getElementById('add-revenue-modal').style.display='none'" class="btn btn-ghost" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function logRevenue() {
+  const amount = parseFloat(document.getElementById('rev-amount').value);
+  const source = document.getElementById('rev-source').value;
+  const note   = document.getElementById('rev-note').value.trim();
+  if (!amount || amount <= 0) { showRevFeedback(false, 'Enter a valid amount.'); return; }
+
+  const res  = await fetch('/api/revenue/entry', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ amount, source, note }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showRevFeedback(true, `✓ $${amount.toFixed(2)} logged! Total: $${data.total_usd.toFixed(2)}`);
+    setTimeout(() => { document.getElementById('add-revenue-modal').style.display='none'; location.reload(); }, 1500);
+  } else {
+    showRevFeedback(false, '⚠ ' + data.error);
+  }
+}
+
+async function saveThreshold() {
+  const t   = parseFloat(document.getElementById('alert-threshold').value);
+  const res = await fetch('/api/revenue/alert-threshold', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ threshold: t }),
+  });
+  const data = await res.json();
+  const st   = document.getElementById('threshold-status');
+  st.textContent = data.success ? '✓ Saved' : '⚠ Failed';
+  st.style.color = data.success ? '#00ff99' : '#ff4466';
+  setTimeout(() => st.textContent = '', 2500);
+}
+
+function connectSource(sid) {
+  alert(`${sid} integration coming in NEXUS v0.2. Until then, log earnings manually using the "Log Revenue" button.`);
+}
+
+function exportCSV() {
+  const entries = {{ (revenue.get('entries') or []) | tojson }};
+  if (!entries.length) { alert('No entries to export.'); return; }
+  const rows = [['Date','Source','Note','Amount USD']];
+  entries.forEach(e => rows.push([e.date.substring(0,10), e.source, e.note||'', e.amount_usd.toFixed(2)]));
+  const csv  = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'nexus_revenue.csv';
+  a.click();
+}
+
+function showRevFeedback(ok, msg) {
+  const el = document.getElementById('rev-feedback');
+  el.style.display = 'flex';
+  el.className = 'alert mb-12 ' + (ok ? 'alert-success' : 'alert-error');
+  el.innerHTML = `<span>${ok?'✓':'⚠'}</span> ${msg}`;
+}
+</script>
+{% endblock %}

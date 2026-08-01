@@ -112,8 +112,33 @@ class DeploymentAI:
 
         ##########################################
 
+        # ── Inject NEXUS branding footer ──────────────────────────────
+        project_type = (
+            project.get("project_type")
+            or project.get("research", {}).get("project_type", "")
+            or project.get("architecture", {}).get("project_type", "")
+            or ""
+        ).lower()
+
+        _BRANDING = {
+            "game"        : "# 🎮 Powered by NEXUS — nexus.ai",
+            "web_app"     : "# 🌐 Created with NEXUS — nexus.ai",
+            "rest_api"    : "# 🔌 Created with NEXUS — nexus.ai",
+            "chat_app"    : "# 💬 Created with NEXUS — nexus.ai",
+            "ai_system"   : "# 🤖 Built with NEXUS AI — nexus.ai",
+            "desktop_gui" : "# 🖥  Crafted with NEXUS — nexus.ai",
+            "data_analyzer": "# 📊 Powered by NEXUS — nexus.ai",
+            "todo_app"    : "# ✅ Made with NEXUS — nexus.ai",
+            "calculator"  : "# 🔢 Made with NEXUS — nexus.ai",
+            "inventory"   : "# 📦 Built with NEXUS — nexus.ai",
+            "scheduler"   : "# 📅 Built with NEXUS — nexus.ai",
+            "file_manager": "# 📁 Built with NEXUS — nexus.ai",
+        }
+        branding_line = _BRANDING.get(project_type, "# ⚡ Built with NEXUS — nexus.ai")
+        branded_source = source.rstrip() + f"\n\n\n{branding_line}\n"
+
         with open(os.path.join(folder, "main.py"), "w") as f:
-            f.write(source)
+            f.write(branded_source)
 
         ##########################################
 

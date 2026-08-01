@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Promote & Ads{% endblock %}
+{% block page_title %}Promote & Ads{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">Promote & Ads</div>
+    <div class="section-sub">Social media management · Google Ads · Comment replies — all from NEXUS</div>
+  </div>
+</div>
+
+<!-- Platform connections -->
+<div class="card mb-24">
+  <div class="card-title mb-4">🔗 Connected Platforms</div>
+  <div class="card-subtitle mb-20">Connect your accounts to post live. Saved posts go into a queue until connected.</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+    {% set platforms = [
+      ('📘','Facebook','facebook'),
+      ('📸','Instagram','instagram'),
+      ('🐦','X / Twitter','twitter'),
+      ('💼','LinkedIn','linkedin'),
+      ('▶️','YouTube','youtube'),
+      ('🎵','TikTok','tiktok'),
+      ('📌','Pinterest','pinterest'),
+      ('🎯','Google Ads','google_ads'),
+    ] %}
+    {% for icon, name, pid in platforms %}
+    {% set connected = promo.get('connected_platforms', []) %}
+    <div style="padding:16px 14px;background:var(--bg-input);border:1px solid {% if pid in connected %}rgba(0,255,153,0.3){% else %}var(--border){% endif %};border-radius:12px;text-align:center;cursor:pointer;"
+         onclick="togglePlatform('{{ pid }}', this)">
+      <div style="font-size:24px;margin-bottom:8px;">{{ icon }}</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;">{{ name }}</div>
+      <div style="font-size:10px;font-weight:700;color:{% if pid in connected %}#00ff99{% else %}var(--text-muted){% endif %};" id="plat-status-{{ pid }}">
+        {{ '✓ Connected' if pid in connected else 'Connect' }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="alert alert-info mt-16" style="margin-bottom:0;">
+    <span>ℹ</span>
+    <div>Full OAuth platform connections coming in NEXUS v0.2. Posts are saved and queued — they'll auto-publish when connections are live.</div>
+  </div>
+</div>
+
+<!-- Post Composer -->
+<div class="card mb-24">
+  <div class="card-title mb-4">✍️ Post Composer</div>
+  <div class="card-subtitle mb-20">Write once, publish across all connected platforms</div>
+
+  <div class="form-group">
+    <label class="form-label">Your Post</label>
+    <textarea id="post-message" class="form-input form-textarea" rows="4"
+      placeholder="Write your announcement, promotion, or update…"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Platforms</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;" id="platform-checkboxes">
+      {% for icon, name, pid in platforms %}
+      {% if pid != 'google_ads' %}
+      <label style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;">
+        <input type="checkbox" name="platforms" value="{{ pid }}" style="accent-color:var(--cyan);">
+        {{ icon }} {{ name }}
+      </label>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div id="post-feedback" style="display:none;" class="alert mb-12"></div>
+
+  <button onclick="submitPost()" class="btn btn-primary">📣 Queue Post</button>
+</div>
+
+<!-- Google Ads Campaign Manager -->
+<div class="card mb-24">
+  <div class="card-title mb-4">🎯 Google Ads Campaigns</div>
+  <div class="card-subtitle mb-20">Create campaigns — NEXUS manages spend, targets, and reporting</div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Campaign Name</label>
+      <input type="text" id="camp-name" class="form-input" placeholder="e.g. App Launch — July 2026">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Daily Budget (USD)</label>
+      <input type="number" id="camp-budget" class="form-input" placeholder="10.00" min="1" step="0.01">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Campaign Goal</label>
+    <select id="camp-goal" class="form-select">
+      <option value="app_installs">📱 App Installs</option>
+      <option value="website_traffic">🌐 Website Traffic</option>
+      <option value="brand_awareness">📣 Brand Awareness</option>
+      <option value="leads">🎯 Lead Generation</option>
+      <option value="sales">💰 Sales / Conversions</option>
+    </select>
+  </div>
+
+  <div id="camp-feedback" style="display:none;" class="alert mb-12"></div>
+  <button onclick="createCampaign()" class="btn btn-primary">🎯 Create Campaign</button>
+</div>
+
+<!-- Queued posts & campaigns -->
+{% if promo.get('posts') %}
+<div class="card mb-24">
+  <div class="card-title mb-16">📋 Post Queue</div>
+  {% for post in (promo.get('posts') or [])[:8] %}
+  <div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    <div style="flex:1;overflow:hidden;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ post.message[:80] }}</div>
+      <div style="font-size:11px;color:var(--text-muted);">{{ ', '.join(post.get('platforms',[])) or 'All platforms' }} &nbsp;·&nbsp; {{ post.created_at[:10] }}</div>
+    </div>
+    <span class="badge badge-{% if post.status == 'published' %}green{% elif post.status == 'queued' %}blue{% else %}yellow{% endif %}">
+      {{ post.status | title }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if promo.get('campaigns') %}
+<div class="card">
+  <div class="card-title mb-16">🎯 Ad Campaigns</div>
+  {% for c in (promo.get('campaigns') or [])[:8] %}
+  <div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;">
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:3px;">{{ c.name }}</div>
+      <div style="font-size:11px;color:var(--text-muted);">Budget: ${{ '%.2f'|format(c.budget_usd) }}/day &nbsp;·&nbsp; {{ c.goal }} &nbsp;·&nbsp; {{ c.created_at[:10] }}</div>
+    </div>
+    <span class="badge badge-{% if c.status == 'live' %}green{% elif c.status == 'draft' %}yellow{% else %}blue{% endif %}">
+      {{ c.status | title }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+async function togglePlatform(pid, el) {
+  const statusEl = document.getElementById('plat-status-' + pid);
+  const isConnected = statusEl.textContent.includes('Connected');
+  // Toggle visual only until OAuth is wired
+  if (isConnected) {
+    statusEl.textContent = 'Connect';
+    statusEl.style.color = 'var(--text-muted)';
+    el.style.borderColor = 'var(--border)';
+  } else {
+    statusEl.textContent = '✓ Connected';
+    statusEl.style.color = '#00ff99';
+    el.style.borderColor = 'rgba(0,255,153,0.3)';
+  }
+}
+
+async function submitPost() {
+  const message   = document.getElementById('post-message').value.trim();
+  const platforms = [...document.querySelectorAll('[name="platforms"]:checked')].map(c => c.value);
+  if (!message) { showFeedback('post-feedback', false, 'Write a post first.'); return; }
+
+  const res  = await fetch('/api/promote/post', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ message, platforms }),
+  });
+  const data = await res.json();
+  showFeedback('post-feedback', data.success,
+    data.success ? ('✓ Post queued. ' + (data.note || '')) : ('⚠ ' + data.error));
+  if (data.success) { document.getElementById('post-message').value = ''; setTimeout(() => location.reload(), 2000); }
+}
+
+async function createCampaign() {
+  const name   = document.getElementById('camp-name').value.trim();
+  const budget = document.getElementById('camp-budget').value;
+  const goal   = document.getElementById('camp-goal').value;
+  if (!name || !budget) { showFeedback('camp-feedback', false, 'Name and budget are required.'); return; }
+
+  const res  = await fetch('/api/promote/campaign', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ name, budget, goal }),
+  });
+  const data = await res.json();
+  showFeedback('camp-feedback', data.success,
+    data.success ? ('✓ Campaign created (draft). ' + (data.note || '')) : ('⚠ ' + data.error));
+  if (data.success) setTimeout(() => location.reload(), 2000);
+}
+
+function showFeedback(elId, ok, msg) {
+  const el = document.getElementById(elId);
+  el.style.display = 'flex';
+  el.className = 'alert mb-12 ' + (ok ? 'alert-success' : 'alert-error');
+  el.innerHTML = `<span>${ok ? '✓' : '⚠'}</span> ${msg}`;
+}
+</script>
+{% endblock %}

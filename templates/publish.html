@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}App Store Publish{% endblock %}
+{% block page_title %}App Store Publish{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">App Store Publishing</div>
+    <div class="section-sub">NEXUS always asks you before publishing — you are in full control</div>
+  </div>
+</div>
+
+<!-- Founder approval banner -->
+<div class="card mb-24" style="border-color:rgba(0,212,255,0.35);background:linear-gradient(135deg,rgba(0,212,255,0.05),rgba(138,43,226,0.03));">
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <div style="font-size:28px;flex-shrink:0;">🔐</div>
+    <div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--cyan);">Founder Approval Required</div>
+      <div style="font-size:13px;color:var(--text-mid);line-height:1.7;">
+        NEXUS will <strong>never</strong> publish an app without your explicit approval.
+        Every publish request shows here and sends an SMS to your phone.
+        You approve or reject — then NEXUS prepares the store package.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pending approval requests -->
+{% set pending = pub_requests | selectattr('status','equalto','pending') | list %}
+{% if pending %}
+<div class="card mb-24" style="border-color:rgba(255,204,0,0.35);">
+  <div class="card-title mb-16" style="color:var(--yellow);">⏳ Awaiting Your Approval ({{ pending|length }})</div>
+  {% for req in pending %}
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg-input);border:1px solid rgba(255,204,0,0.2);border-radius:12px;margin-bottom:10px;" id="req-{{ req.id }}">
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">{{ req.goal[:80] }}</div>
+      <div style="font-size:11px;color:var(--text-muted);">
+        Store: <span style="color:var(--cyan);">{{ req.store }}</span> &nbsp;·&nbsp; Requested {{ req.created_at[:10] }}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button onclick="approveRequest('{{ req.id }}')" class="btn btn-sm"
+        style="background:rgba(0,255,153,0.12);border:1px solid rgba(0,255,153,0.3);color:#00ff99;font-weight:700;">
+        ✓ Approve
+      </button>
+      <button onclick="rejectRequest('{{ req.id }}')" class="btn btn-sm"
+        style="background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);color:#ff4466;">
+        ✗ Reject
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- New publish request form -->
+<div class="card mb-24">
+  <div class="card-title mb-4">📤 Request to Publish an App</div>
+  <div class="card-subtitle mb-20">Select a built project and the target store — NEXUS will ask for your approval before doing anything</div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Select Project</label>
+      <select id="pub-project" class="form-select" onchange="onProjectSelect(this)">
+        <option value="">— Choose a built project —</option>
+        {% for p in projects %}
+          {% if p.get('status') in ('complete','DEPLOYED','PROGRAMMING_PHASE_COMPLETE') %}
+          <option value="{{ p.get('task_id','') }}" data-goal="{{ p.get('goal','')[:80] }}">
+            {{ p.get('goal','?')[:60] }}
+          </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Store</label>
+      <select id="pub-store" class="form-select">
+        <option value="playstore">🤖 Google Play Store</option>
+        <option value="appstore">🍎 Apple App Store</option>
+        <option value="web">🌐 Web Hosting</option>
+        <option value="amazon">📦 Amazon Appstore</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="pub-feedback" style="display:none;" class="alert mb-16"></div>
+
+  <button onclick="requestPublish()" class="btn btn-primary btn-lg">
+    📤 Request Publish (Approval Required)
+  </button>
+</div>
+
+<!-- Store targets info -->
+<div class="grid-2 mb-24">
+  {% set stores = [
+    ('🤖','Google Play Store','Android apps (APK/AAB)','Requires: Google Play Developer Account ($25 one-time). NEXUS generates the store listing, screenshots manifest, and release package.','playstore'),
+    ('🍎','Apple App Store','iOS apps (IPA)','Requires: Apple Developer Account ($99/yr). NEXUS generates App Store Connect metadata, TestFlight notes, and submission package.','appstore'),
+    ('🌐','Web Hosting','Progressive Web Apps','Deploy to any static host. NEXUS generates build assets, service worker, and deployment manifest.','web'),
+    ('📦','Amazon Appstore','Android apps (APK)','Alternative Android store. NEXUS generates the Amazon submission package.','amazon'),
+  ] %}
+  {% for icon, name, sub, desc, val in stores %}
+  <div class="card" style="cursor:pointer;" onclick="document.getElementById('pub-store').value='{{ val }}'">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:28px;">{{ icon }}</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:2px;">{{ name }}</div>
+        <div style="font-size:11px;color:var(--cyan);margin-bottom:8px;">{{ sub }}</div>
+        <div style="font-size:12px;color:var(--text-mid);line-height:1.6;">{{ desc }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Publish history -->
+{% set done = pub_requests | rejectattr('status','equalto','pending') | list %}
+{% if done %}
+<div class="card">
+  <div class="card-title mb-16">📋 Publish History</div>
+  {% for req in done | sort(attribute='created_at', reverse=True) %}
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+    <div style="flex:1;overflow:hidden;">
+      <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">{{ req.goal[:70] }}</div>
+      <div style="font-size:11px;color:var(--text-muted);">{{ req.store }} &nbsp;·&nbsp; {{ req.created_at[:10] }}</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:12px;">
+      {% if req.status == 'packaged' %}
+        <span class="badge badge-green">Packaged</span>
+        <a href="/api/publish/{{ req.id }}/download" class="btn btn-sm" style="font-size:11px;">⬇ Download</a>
+      {% elif req.status == 'rejected' %}
+        <span class="badge badge-red">Rejected</span>
+      {% elif req.status == 'approved' %}
+        <span class="badge badge-blue">Approved</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Approval modal -->
+<div id="approve-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border:1px solid var(--cyan-border);border-radius:20px;padding:32px;max-width:480px;width:90%;text-align:center;">
+    <div style="font-size:40px;margin-bottom:16px;">🔐</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:12px;">Approve Publish Request?</div>
+    <div style="font-size:13px;color:var(--text-mid);margin-bottom:24px;line-height:1.7;" id="modal-desc">—</div>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button id="modal-approve-btn" class="btn btn-primary btn-lg" style="flex:1;">✓ Approve</button>
+      <button onclick="closeModal()" class="btn btn-ghost btn-lg" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let pendingApprovalId = null;
+
+function onProjectSelect(el) {
+  const opt = el.options[el.selectedIndex];
+}
+
+async function requestPublish() {
+  const sel    = document.getElementById('pub-project');
+  const store  = document.getElementById('pub-store').value;
+  const taskId = sel.value;
+  const goal   = sel.options[sel.selectedIndex]?.dataset?.goal || sel.options[sel.selectedIndex]?.text || '';
+
+  if (!taskId) { showFeedback(false, 'Please select a project first.'); return; }
+
+  const res  = await fetch('/api/publish/request', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ goal, store, task_id: taskId }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showFeedback(true, '✓ Publish request created. Check your phone for an SMS approval alert — or approve it directly above.');
+    setTimeout(() => location.reload(), 2000);
+  } else {
+    showFeedback(false, '⚠ ' + data.error);
+  }
+}
+
+function approveRequest(id) {
+  const card = document.getElementById('req-' + id);
+  const goal = card?.querySelector('div > div')?.textContent?.trim() || 'this app';
+  pendingApprovalId = id;
+  document.getElementById('modal-desc').textContent =
+    `NEXUS will generate the store submission package for "${goal.substring(0,60)}". This does NOT upload to the store — you download and submit manually.`;
+  const modal = document.getElementById('approve-modal');
+  modal.style.display = 'flex';
+  document.getElementById('modal-approve-btn').onclick = async () => {
+    document.getElementById('modal-approve-btn').textContent = 'Generating package…';
+    document.getElementById('modal-approve-btn').disabled = true;
+    const res  = await fetch(`/api/publish/approve/${pendingApprovalId}`, { method: 'POST' });
+    const data = await res.json();
+    closeModal();
+    if (data.success) {
+      showFeedback(true, '✅ Package ready! Reloading…');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showFeedback(false, '⚠ ' + data.error);
+    }
+  };
+}
+
+async function rejectRequest(id) {
+  const res  = await fetch(`/api/publish/reject/${id}`, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) setTimeout(() => location.reload(), 500);
+}
+
+function closeModal() {
+  document.getElementById('approve-modal').style.display = 'none';
+  pendingApprovalId = null;
+}
+
+function showFeedback(ok, msg) {
+  const el  = document.getElementById('pub-feedback');
+  el.style.display = 'flex';
+  el.className = 'alert mb-16 ' + (ok ? 'alert-success' : 'alert-error');
+  el.innerHTML = `<span>${ok ? '✓' : '⚠'}</span> ${msg}`;
+}
+</script>
+{% endblock %}

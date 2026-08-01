@@ -382,6 +382,241 @@ def api_build_download(task_id):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PUBLISH — App Store Publishing (founder-approval gated)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/publish')
+@login_required
+def publish():
+    owner    = owner_mgr.get_owner()
+    projects = _load_projects()
+    requests = _load_publish_requests()
+    return render_template('publish.html', owner=owner, projects=projects,
+                           pub_requests=requests)
+
+
+@app.route('/api/publish/request', methods=['POST'])
+@login_required
+def api_publish_request():
+    """Create a pending publish request — must be approved by founder before executing."""
+    data    = request.json or {}
+    goal    = data.get('goal', '').strip()
+    store   = data.get('store', '').strip()        # playstore | appstore | web
+    task_id = data.get('task_id', '').strip()
+    if not goal or not store:
+        return jsonify({'success': False, 'error': 'goal and store are required'}), 400
+
+    req_id  = f"pub_{int(time.time() * 1000)}"
+    pub_req = {
+        'id'          : req_id,
+        'task_id'     : task_id,
+        'goal'        : goal,
+        'store'       : store,
+        'status'      : 'pending',
+        'created_at'  : datetime.datetime.now().isoformat(),
+        'approved_at' : None,
+        'package_path': None,
+    }
+    requests = _load_publish_requests()
+    requests.append(pub_req)
+    _save_publish_requests(requests)
+
+    # SMS alert to founder
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    if phone:
+        _send_alert_sms(phone,
+            f"⚠️ NEXUS Publish Request\nNEXUS wants to publish '{goal[:60]}' to {store}.\n"
+            f"Log in → App Store Publish to approve or reject."
+        )
+    return jsonify({'success': True, 'request_id': req_id})
+
+
+@app.route('/api/publish/approve/<req_id>', methods=['POST'])
+@login_required
+def api_publish_approve(req_id):
+    """Founder approves a publish request → NEXUS generates the store package."""
+    requests = _load_publish_requests()
+    req = next((r for r in requests if r['id'] == req_id), None)
+    if not req:
+        return jsonify({'success': False, 'error': 'Request not found'}), 404
+    if req['status'] != 'pending':
+        return jsonify({'success': False, 'error': f"Already {req['status']}"}), 400
+
+    req['status']      = 'approved'
+    req['approved_at'] = datetime.datetime.now().isoformat()
+
+    # Generate store package
+    package_path = _generate_store_package(req)
+    req['package_path'] = package_path
+    req['status']       = 'packaged'
+    _save_publish_requests(requests)
+
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    if phone:
+        _send_alert_sms(phone,
+            f"✅ NEXUS Published\n'{req['goal'][:60]}' store package ready → {package_path}"
+        )
+    return jsonify({'success': True, 'package_path': package_path})
+
+
+@app.route('/api/publish/reject/<req_id>', methods=['POST'])
+@login_required
+def api_publish_reject(req_id):
+    """Founder rejects a publish request."""
+    requests = _load_publish_requests()
+    req = next((r for r in requests if r['id'] == req_id), None)
+    if not req:
+        return jsonify({'success': False, 'error': 'Request not found'}), 404
+    req['status']      = 'rejected'
+    req['rejected_at'] = datetime.datetime.now().isoformat()
+    _save_publish_requests(requests)
+    return jsonify({'success': True})
+
+
+@app.route('/api/publish/<req_id>/download')
+@login_required
+def api_publish_download(req_id):
+    """Zip and serve a store package."""
+    requests = _load_publish_requests()
+    req      = next((r for r in requests if r['id'] == req_id), None)
+    if not req or not req.get('package_path'):
+        return jsonify({'error': 'Package not found'}), 404
+    base = Path(req['package_path'])
+    if not base.exists():
+        return jsonify({'error': 'Package folder missing'}), 404
+    mem_zip = io.BytesIO()
+    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fp in sorted(base.rglob('*')):
+            if fp.is_file():
+                zf.write(fp, fp.relative_to(base))
+    mem_zip.seek(0)
+    return send_file(mem_zip, mimetype='application/zip', as_attachment=True,
+                     download_name=f"{base.name}.zip")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROMOTE — Social Media & Google Ads
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/promote')
+@login_required
+def promote():
+    owner    = owner_mgr.get_owner()
+    promo    = _load_promo_data()
+    return render_template('promote.html', owner=owner, promo=promo)
+
+
+@app.route('/api/promote/post', methods=['POST'])
+@login_required
+def api_promote_post():
+    data      = request.json or {}
+    message   = data.get('message', '').strip()
+    platforms = data.get('platforms', [])
+    if not message:
+        return jsonify({'success': False, 'error': 'Message is required'}), 400
+
+    promo = _load_promo_data()
+    entry = {
+        'id'        : f"post_{int(time.time()*1000)}",
+        'message'   : message,
+        'platforms' : platforms,
+        'status'    : 'queued',
+        'created_at': datetime.datetime.now().isoformat(),
+        'note'      : 'Platform API not yet connected — connect accounts in Settings to post live.',
+    }
+    promo.setdefault('posts', []).insert(0, entry)
+    _save_promo_data(promo)
+    return jsonify({'success': True, 'post_id': entry['id'],
+                    'note': entry['note']})
+
+
+@app.route('/api/promote/campaign', methods=['POST'])
+@login_required
+def api_promote_campaign():
+    data   = request.json or {}
+    name   = data.get('name', '').strip()
+    budget = data.get('budget', 0)
+    goal   = data.get('goal', '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Campaign name required'}), 400
+    promo   = _load_promo_data()
+    campaign = {
+        'id'        : f"camp_{int(time.time()*1000)}",
+        'name'      : name,
+        'budget_usd': float(budget),
+        'goal'      : goal,
+        'status'    : 'draft',
+        'created_at': datetime.datetime.now().isoformat(),
+        'note'      : 'Google Ads API not yet connected — add credentials in Settings to go live.',
+    }
+    promo.setdefault('campaigns', []).insert(0, campaign)
+    _save_promo_data(promo)
+    return jsonify({'success': True, 'campaign_id': campaign['id'],
+                    'note': campaign['note']})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REVENUE — Dashboard & Tracking
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/revenue')
+@login_required
+def revenue():
+    owner   = owner_mgr.get_owner()
+    rev     = _load_revenue_data()
+    summary = _revenue_summary(rev)
+    return render_template('revenue.html', owner=owner, revenue=rev, summary=summary)
+
+
+@app.route('/api/revenue/entry', methods=['POST'])
+@login_required
+def api_revenue_entry():
+    """Manual revenue entry (until platform APIs are connected)."""
+    data   = request.json or {}
+    amount = float(data.get('amount', 0))
+    source = data.get('source', 'manual').strip()
+    note   = data.get('note', '').strip()
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'Amount must be > 0'}), 400
+    rev = _load_revenue_data()
+    entry = {
+        'id'        : f"rev_{int(time.time()*1000)}",
+        'amount_usd': amount,
+        'source'    : source,
+        'note'      : note,
+        'date'      : datetime.datetime.now().isoformat(),
+    }
+    rev.setdefault('entries', []).insert(0, entry)
+    _save_revenue_data(rev)
+
+    # SMS if milestone hit
+    total = sum(e.get('amount_usd', 0) for e in rev['entries'])
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    for milestone in [10, 50, 100, 500, 1000, 5000, 10000]:
+        prev = total - amount
+        if prev < milestone <= total and phone:
+            _send_alert_sms(phone,
+                f"🎉 NEXUS Revenue Milestone!\nYou've earned ${milestone}+ total. "
+                f"Latest: ${amount:.2f} from {source}."
+            )
+            break
+    return jsonify({'success': True, 'entry': entry, 'total_usd': total})
+
+
+@app.route('/api/revenue/alert-threshold', methods=['POST'])
+@login_required
+def api_revenue_alert_threshold():
+    data = request.json or {}
+    rev  = _load_revenue_data()
+    rev['alert_threshold'] = float(data.get('threshold', 100))
+    _save_revenue_data(rev)
+    return jsonify({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # WORKERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -537,6 +772,155 @@ def _run_pipeline(task_id: str, goal: str):
         build['error']  = str(exc)
         build['logs'].append(f"[ERROR] {exc}")
 
+
+# ── Publish helpers ────────────────────────────────────────────────────────────
+
+def _load_publish_requests() -> list:
+    fp = Config.ROOT / 'data' / 'publish_requests.json'
+    if fp.exists():
+        try:
+            with open(fp) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _save_publish_requests(requests: list):
+    fp = Config.ROOT / 'data' / 'publish_requests.json'
+    fp.parent.mkdir(exist_ok=True)
+    with open(fp, 'w') as f:
+        json.dump(requests, f, indent=2)
+
+def _generate_store_package(req: dict) -> str:
+    """Generate a store submission package folder for the given publish request."""
+    store   = req.get('store', 'playstore')
+    goal    = req.get('goal', 'app')[:50].replace(' ', '_').replace('/', '_')
+    req_id  = req.get('id', 'pkg')
+    folder  = Config.ROOT / 'deployments' / f"store_{req_id}_{goal}"
+    folder.mkdir(parents=True, exist_ok=True)
+
+    store_meta = {
+        'store'           : store,
+        'app_name'        : req.get('goal', 'My App')[:30],
+        'short_description': req.get('goal', '')[:80],
+        'long_description' : (
+            f"{req.get('goal', 'App')} — Built and packaged by NEXUS AI Operating System.\n\n"
+            "Powered by NEXUS · nexus.ai"
+        ),
+        'version'         : '1.0.0',
+        'package_name'    : f"ai.nexus.{goal.lower()[:20]}",
+        'category'        : 'Productivity',
+        'content_rating'  : 'Everyone',
+        'generated_at'    : datetime.datetime.now().isoformat(),
+    }
+
+    with open(folder / 'store_listing.json', 'w') as f:
+        json.dump(store_meta, f, indent=2)
+
+    readme_lines = [
+        f"# {req.get('goal', 'App')} — Store Submission Package",
+        f"\nGenerated by NEXUS AI · {store}",
+        "\n## Files in this package",
+        "- `store_listing.json` — App metadata (title, description, category, etc.)",
+        "- `SUBMISSION_GUIDE.md` — Step-by-step submission instructions",
+        "- `screenshots/` — Add your screenshots here (required by stores)",
+        "\n## Next Steps",
+    ]
+    if store == 'playstore':
+        readme_lines += [
+            "1. Go to https://play.google.com/console",
+            "2. Create a new application",
+            "3. Copy values from store_listing.json into the store listing form",
+            "4. Upload your APK/AAB (from your build output)",
+            "5. Add screenshots (min 2, max 8 — 1080×1920 recommended)",
+            "6. Submit for review (3–7 days)",
+        ]
+    elif store == 'appstore':
+        readme_lines += [
+            "1. Go to https://appstoreconnect.apple.com",
+            "2. Create a new app",
+            "3. Copy values from store_listing.json",
+            "4. Upload IPA via Xcode or Transporter",
+            "5. Add screenshots (required for each device size)",
+            "6. Submit for review (1–3 days)",
+        ]
+    else:
+        readme_lines += [
+            "1. Build your project: `npm run build` or `python main.py`",
+            "2. Upload the output folder to your hosting provider",
+            "3. Set the domain in your DNS settings",
+        ]
+    readme_lines.append("\n---\n*Built with NEXUS AI Operating System — nexus.ai*")
+
+    with open(folder / 'SUBMISSION_GUIDE.md', 'w') as f:
+        f.write('\n'.join(readme_lines))
+
+    (folder / 'screenshots').mkdir(exist_ok=True)
+    with open(folder / 'screenshots' / 'README.txt', 'w') as f:
+        f.write("Add your app screenshots here before submitting to the store.\n"
+                "Recommended: 1080x1920 PNG, at least 2 screenshots.\n")
+
+    return str(folder)
+
+
+# ── Promote helpers ────────────────────────────────────────────────────────────
+
+def _load_promo_data() -> dict:
+    fp = Config.ROOT / 'data' / 'promo.json'
+    if fp.exists():
+        try:
+            with open(fp) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {'posts': [], 'campaigns': [], 'connected_platforms': []}
+
+def _save_promo_data(data: dict):
+    fp = Config.ROOT / 'data' / 'promo.json'
+    fp.parent.mkdir(exist_ok=True)
+    with open(fp, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+# ── Revenue helpers ────────────────────────────────────────────────────────────
+
+def _load_revenue_data() -> dict:
+    fp = Config.ROOT / 'data' / 'revenue.json'
+    if fp.exists():
+        try:
+            with open(fp) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {'entries': [], 'alert_threshold': 100}
+
+def _save_revenue_data(data: dict):
+    fp = Config.ROOT / 'data' / 'revenue.json'
+    fp.parent.mkdir(exist_ok=True)
+    with open(fp, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def _revenue_summary(rev: dict) -> dict:
+    entries    = rev.get('entries', [])
+    total      = sum(e.get('amount_usd', 0) for e in entries)
+    now        = datetime.datetime.now()
+    this_month = sum(
+        e.get('amount_usd', 0) for e in entries
+        if e.get('date', '')[:7] == now.strftime('%Y-%m')
+    )
+    by_source: dict = {}
+    for e in entries:
+        s = e.get('source', 'other')
+        by_source[s] = by_source.get(s, 0) + e.get('amount_usd', 0)
+    return {
+        'total_usd'      : total,
+        'this_month_usd' : this_month,
+        'entry_count'    : len(entries),
+        'by_source'      : dict(sorted(by_source.items(), key=lambda x: x[1], reverse=True)),
+    }
+
+
+# ── Alert / pipeline helpers ───────────────────────────────────────────────────
 
 def _send_alert_sms(phone: str, message: str) -> dict:
     """Send an SMS alert via Twilio. Silent no-op if Twilio not configured."""

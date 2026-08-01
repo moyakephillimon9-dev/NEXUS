@@ -45,6 +45,18 @@
         <span class="nav-icon">🤖</span> AI Workers
       </a>
 
+      <div class="nav-section-label">Publish & Earn</div>
+
+      <a href="{{ url_for('publish') }}" class="nav-item{% if request.endpoint == 'publish' %} active{% endif %}">
+        <span class="nav-icon">🚀</span> App Store Publish
+      </a>
+      <a href="{{ url_for('promote') }}" class="nav-item{% if request.endpoint == 'promote' %} active{% endif %}">
+        <span class="nav-icon">📣</span> Promote & Ads
+      </a>
+      <a href="{{ url_for('revenue') }}" class="nav-item{% if request.endpoint == 'revenue' %} active{% endif %}">
+        <span class="nav-icon">💰</span> Revenue
+      </a>
+
       <div class="nav-section-label">Intelligence</div>
 
       <a href="{{ url_for('memory') }}" class="nav-item{% if request.endpoint == 'memory' %} active{% endif %}">
