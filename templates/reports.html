@@ -9,7 +9,18 @@
     <div class="section-title">Reports</div>
     <div class="section-sub">Generated {{ report.generated_at }}</div>
   </div>
-  <a href="{{ url_for('reports') }}" class="btn btn-ghost btn-sm">↻ Refresh</a>
+  <div style="display:flex;gap:10px;">
+    <button onclick="sendReportSMS()" class="btn btn-ghost btn-sm" id="sms-alert-btn" title="Send report summary to your phone">
+      📲 SMS Alert
+    </button>
+    <a href="{{ url_for('reports') }}" class="btn btn-ghost btn-sm">↻ Refresh</a>
+  </div>
+</div>
+
+<!-- SMS feedback -->
+<div id="sms-feedback" style="display:none;" class="alert mb-16">
+  <span id="sms-feedback-icon">✓</span>
+  <span id="sms-feedback-msg"></span>
 </div>
 
 <!-- Summary stats -->
@@ -44,6 +55,49 @@
   </div>
 </div>
 
+<!-- Revenue Opportunities (shown when completed projects exist) -->
+{% if report.completed > 0 %}
+<div class="card mb-24" style="border-color:rgba(138,43,226,0.4);background:linear-gradient(135deg,rgba(138,43,226,0.05),rgba(0,212,255,0.03));">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+    <div>
+      <div class="card-title" style="color:#c084fc;">💰 Revenue Opportunities</div>
+      <div class="card-subtitle">Projects ready to monetise and publish</div>
+    </div>
+    <button onclick="sendRevenueSMS()" class="btn btn-sm"
+      style="background:rgba(138,43,226,0.15);border:1px solid rgba(138,43,226,0.4);color:#c084fc;font-size:11px;">
+      📲 Alert Me
+    </button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    {% for p in report.recent %}
+      {% if p.get('status') == 'complete' or p.get('status') == 'DEPLOYED' %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">
+            {{ p.get('goal', p.get('task_id', '—'))[:70] }}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">
+            Ready to publish · {{ p.get('timestamp','')[:10] if p.get('timestamp') else 'Recently built' }}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <span class="badge badge-green">Deployable</span>
+          <a href="{{ url_for('builder') }}" class="btn btn-sm" style="font-size:11px;padding:3px 10px;">Publish →</a>
+        </div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="alert alert-info mt-16" style="margin-bottom:0;">
+    <span>🚀</span>
+    <div>
+      <strong>Coming soon:</strong> One-click publish to Google Play Store, Apple App Store, and web hosting.
+      Auto-promotion via Google Ads and social media is on the <a href="{{ url_for('roadmap') }}">Roadmap</a>.
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid-2">
 
   <!-- Recent projects -->
@@ -62,7 +116,7 @@
           </div>
         </div>
         {% set s = p.get('status', 'unknown') %}
-        <span class="badge {% if s == 'complete' %}badge-green{% elif s == 'error' %}badge-red{% else %}badge-blue{% endif %}">
+        <span class="badge {% if s in ('complete','DEPLOYED') %}badge-green{% elif s == 'error' %}badge-red{% else %}badge-blue{% endif %}">
           {{ s | title }}
         </span>
       </div>
@@ -109,13 +163,55 @@
 
 </div>
 
-<!-- Future reports note -->
-<div class="alert alert-info mt-24">
-  <span>ℹ</span>
-  <div>
-    <strong>Coming in NEXUS v0.2</strong> — Daily, weekly and monthly automated reports with pipeline analytics,
-    performance benchmarks, error analysis and improvement recommendations.
-    See the <a href="{{ url_for('roadmap') }}">Roadmap</a> for details.
-  </div>
-</div>
+<script>
+async function sendReportSMS() {
+  const btn = document.getElementById('sms-alert-btn');
+  btn.disabled = true;
+  btn.textContent = '📲 Sending…';
+
+  const stats = {
+    total:     {{ report.total_projects }},
+    completed: {{ report.completed }},
+    errors:    {{ report.errors }},
+  };
+  const msg = `📊 NEXUS Report — ${stats.completed}/${stats.total} projects complete, ${stats.errors} errors. Check dashboard for details.`;
+
+  const res  = await fetch('/api/sms/alert', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ message: msg }),
+  });
+  const data = await res.json();
+  showSMSFeedback(data.success, data.success ? 'Report sent to your phone.' : ('⚠ ' + data.error));
+  btn.disabled = false;
+  btn.textContent = '📲 SMS Alert';
+}
+
+async function sendRevenueSMS() {
+  const projects = {{ report.recent | tojson }};
+  const ready    = projects.filter(p => p.status === 'complete' || p.status === 'DEPLOYED');
+  const names    = ready.slice(0,3).map(p => (p.goal || p.task_id || '?').substring(0,40)).join('; ');
+  const msg      = `💰 NEXUS Revenue Alert — ${ready.length} project(s) ready to publish: ${names}. Log in to deploy.`;
+
+  const res  = await fetch('/api/sms/alert', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ message: msg }),
+  });
+  const data = await res.json();
+  showSMSFeedback(data.success, data.success ? '💰 Revenue alert sent to your phone!' : ('⚠ ' + data.error));
+}
+
+function showSMSFeedback(ok, msg) {
+  const el  = document.getElementById('sms-feedback');
+  const ico = document.getElementById('sms-feedback-icon');
+  const txt = document.getElementById('sms-feedback-msg');
+  el.style.display   = 'flex';
+  el.className       = 'alert mb-16 ' + (ok ? 'alert-success' : 'alert-error');
+  ico.textContent    = ok ? '✓' : '⚠';
+  txt.textContent    = msg;
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+</script>
+
 {% endblock %}

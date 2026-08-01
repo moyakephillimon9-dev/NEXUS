@@ -145,9 +145,21 @@
 
     <div id="settings-phone-status" style="font-size:12px;min-height:18px;"></div>
 
+    <!-- Test SMS -->
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Test SMS Alerts</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button type="button" id="test-sms-btn" onclick="testSMS()"
+          style="padding:0 20px;height:40px;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
+          ⚡ Send Test SMS
+        </button>
+        <span id="test-sms-status" style="font-size:12px;"></span>
+      </div>
+    </div>
+
     <div class="alert alert-info mt-12">
       <span>ℹ</span>
-      <div>Requires <strong>TWILIO_ACCOUNT_SID</strong>, <strong>TWILIO_AUTH_TOKEN</strong>, and <strong>TWILIO_PHONE_NUMBER</strong> in Replit Secrets.</div>
+      <div>Requires <strong>TWILIO_ACCOUNT_SID</strong>, <strong>TWILIO_AUTH_TOKEN</strong>, and <strong>TWILIO_PHONE_NUMBER</strong> in Replit Secrets. SMS alerts fire automatically when builds complete and when revenue opportunities are detected in Reports.</div>
     </div>
   </div>
 
@@ -204,6 +216,33 @@ async function settingsSendOTP() {
     setSettingsStatus('⚠ ' + data.error, 'err');
     btn.disabled = false; btn.textContent = 'Send Code';
   }
+}
+
+async function testSMS() {
+  const btn = document.getElementById('test-sms-btn');
+  const st  = document.getElementById('test-sms-status');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  st.textContent = '';
+  st.style.color = 'var(--blue)';
+  st.textContent = 'Sending test message…';
+
+  try {
+    const res  = await fetch('/api/sms/test', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      st.style.color = '#00ff88';
+      st.textContent = '✓ Test SMS sent! Check your phone.';
+    } else {
+      st.style.color = '#ff4d6d';
+      st.textContent = '⚠ ' + data.error;
+    }
+  } catch (e) {
+    st.style.color = '#ff4d6d';
+    st.textContent = '⚠ Network error.';
+  }
+  btn.disabled = false;
+  btn.textContent = '⚡ Send Test SMS';
 }
 
 async function settingsVerifyOTP() {

@@ -174,6 +174,36 @@ def api_twilio_status():
     return jsonify({'configured': sms_otp.is_configured()})
 
 
+@app.route('/api/sms/test', methods=['POST'])
+@login_required
+def api_sms_test():
+    """Send a test SMS to the owner's registered phone."""
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on your profile. Add one in Settings first.'}), 400
+    if not sms_otp.is_configured():
+        return jsonify({'success': False, 'error': 'Twilio secrets not set. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in Replit Secrets.'}), 400
+    result = _send_alert_sms(phone, f"✅ NEXUS SMS Test — your alerts are working! System is online.")
+    return jsonify(result)
+
+
+@app.route('/api/sms/alert', methods=['POST'])
+@login_required
+def api_sms_alert():
+    """Send a manual SMS alert with a custom message."""
+    data    = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'success': False, 'error': 'Message is required.'}), 400
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on your profile.'}), 400
+    result = _send_alert_sms(phone, message)
+    return jsonify(result)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN DASHBOARD
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -499,10 +529,47 @@ def _run_pipeline(task_id: str, goal: str):
         else:
             build['logs'].append("[NEXUS] ✓ Pipeline complete. (Deployment path not generated)")
 
+        # ── SMS alert on completion ────────────────────────────────────────
+        _notify_build_complete(goal, deploy_path)
+
     except Exception as exc:
         build['status'] = 'error'
         build['error']  = str(exc)
         build['logs'].append(f"[ERROR] {exc}")
+
+
+def _send_alert_sms(phone: str, message: str) -> dict:
+    """Send an SMS alert via Twilio. Silent no-op if Twilio not configured."""
+    if not sms_otp.is_configured():
+        return {'success': False, 'error': 'Twilio not configured'}
+    try:
+        import os
+        from twilio.rest import Client
+        client = Client(os.environ['TWILIO_ACCOUNT_SID'], os.environ['TWILIO_AUTH_TOKEN'])
+        client.messages.create(
+            body=message[:1600],
+            from_=os.environ['TWILIO_PHONE_NUMBER'],
+            to=phone,
+        )
+        return {'success': True}
+    except Exception as exc:
+        return {'success': False, 'error': str(exc)}
+
+
+def _notify_build_complete(goal: str, deploy_path):
+    """Fire-and-forget SMS when a pipeline build completes."""
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '').strip()
+    if not phone:
+        return
+    short_goal = goal[:80] + ('…' if len(goal) > 80 else '')
+    has_files  = bool(deploy_path and Path(deploy_path).exists())
+    msg = (
+        f"⚡ NEXUS Build Complete\n"
+        f"Goal: {short_goal}\n"
+        + (f"Files ready to download at {deploy_path}" if has_files else "Pipeline finished (no deploy artefacts).")
+    )
+    threading.Thread(target=_send_alert_sms, args=(phone, msg), daemon=True).start()
 
 
 def _load_projects() -> list:
