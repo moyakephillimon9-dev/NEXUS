@@ -2,3 +2,4 @@
 - [Deployment AI requirements fix](deployment-ai-requirements.md) — requirements.txt must use code.get("requirements", []) not hardcoded deps
 - [Vision document bugs](vision-document-bugs.md) — two bugs when goal is a large vision doc; both fixed
 - [Web platform architecture](web-platform-architecture.md) — Flask web app on top of existing CLI; app.py is the new entry point; nexus.py CLI preserved
+- [Chat and workers integration](chat-workers-integration.md) — chat detects build intent and shows Launch Build card; workers live SSE at /api/workers/live; notifications at /api/notifications
