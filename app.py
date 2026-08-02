@@ -793,6 +793,63 @@ def api_settings():
     return jsonify({'success': True})
 
 
+@app.route('/api/founder/update-credentials', methods=['POST'])
+@login_required
+def api_founder_update_credentials():
+    """Update founder email, password, or name from the Founder Vault."""
+    data  = request.json or {}
+    kind  = data.get('type', '')
+    fp    = Config.ROOT / 'data' / 'owner.json'
+
+    if not fp.exists():
+        return jsonify({'success': False, 'error': 'Owner not found.'})
+
+    with open(fp) as f:
+        owner = json.load(f)
+
+    auth = Auth()
+
+    if kind == 'email':
+        cur_pw = data.get('current_password', '')
+        if not auth.verify_password(cur_pw, owner.get('password_hash', '')):
+            return jsonify({'success': False, 'error': 'Current password is incorrect.'})
+        new_email = data.get('new_email', '').strip().lower()
+        if not new_email or '@' not in new_email:
+            return jsonify({'success': False, 'error': 'Invalid email address.'})
+        owner['email'] = new_email
+
+    elif kind == 'password':
+        cur_pw = data.get('current_password', '')
+        if not auth.verify_password(cur_pw, owner.get('password_hash', '')):
+            return jsonify({'success': False, 'error': 'Current password is incorrect.'})
+        new_pw = data.get('new_password', '')
+        if len(new_pw) < 8:
+            return jsonify({'success': False, 'error': 'Password must be at least 8 characters.'})
+        owner['password_hash'] = auth.hash_password(new_pw)
+
+    elif kind == 'name':
+        name = data.get('full_name', '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'Name cannot be empty.'})
+        owner['full_name'] = name
+        if data.get('company'):
+            owner['company'] = data['company'].strip()
+
+    else:
+        return jsonify({'success': False, 'error': 'Unknown update type.'})
+
+    owner['updated_at'] = datetime.datetime.now().isoformat()
+    with open(fp, 'w') as f:
+        json.dump(owner, f, indent=2)
+
+    # Force re-login for email/password changes
+    if kind in ('email', 'password'):
+        session.clear()
+        return jsonify({'success': True, 'message': 'Updated. Redirecting to login…'})
+
+    return jsonify({'success': True, 'message': f'{kind.title()} updated successfully.'})
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROADMAP
 # ═══════════════════════════════════════════════════════════════════════════════

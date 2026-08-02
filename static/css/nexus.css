@@ -1101,3 +1101,142 @@ img { max-width: 100%; display: block; }
 .worker-header {
   display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THEME TOGGLE
+   ══════════════════════════════════════════════════════════════ */
+.theme-toggle {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; transition: all 0.2s; flex-shrink: 0;
+}
+.theme-toggle:hover { background: rgba(255,255,255,0.1); border-color: rgba(0,212,255,0.3); }
+
+.theme-toggle-big {
+  padding: 8px 20px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text); cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.theme-toggle-big:hover { background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.25); }
+
+/* ── Light mode overrides ─────────────────────── */
+[data-theme="light"] {
+  --bg:          #f0f4f8;
+  --bg-deep:     #e6ecf2;
+  --bg-sidebar:  #1a2332;
+  --card-bg:     #ffffff;
+  --card-border: rgba(0,0,0,0.09);
+  --bg-input:    rgba(0,0,0,0.04);
+  --bg-hover:    rgba(0,100,200,0.06);
+
+  --text:        #0d1626;
+  --text-mid:    #4a5568;
+  --text-muted:  #9aacbe;
+
+  --cyan-border: rgba(0,100,200,0.25);
+  --cyan:        #0055cc;
+  --purple:      #6b21a8;
+
+  --green:       #059669;
+  --red:         #dc2626;
+  --yellow:      #d97706;
+}
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(0,100,200,0.05) 0%, transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40h80M40 0v80M20 20h40M20 60h40M60 20v40M20 20v40' stroke='rgba(0,100,200,0.04)' stroke-width='0.5'/%3E%3Ccircle cx='40' cy='40' r='2' fill='rgba(0,100,200,0.04)'/%3E%3C/svg%3E");
+}
+[data-theme="light"] .sidebar { background: #0f1d2e; }
+[data-theme="light"] .topbar  { background: rgba(240,244,248,0.95); border-bottom-color: rgba(0,0,0,0.08); }
+[data-theme="light"] .card    { background: #fff; border-color: rgba(0,0,0,0.08); }
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-select {
+  background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.12); color: #0d1626;
+}
+[data-theme="light"] .form-input:focus,
+[data-theme="light"] .form-select:focus { border-color: #0055cc; }
+[data-theme="light"] .nav-item { color: rgba(220,235,255,0.75); }
+[data-theme="light"] .nav-item.active { color: #fff; }
+[data-theme="light"] .sidebar-logo-title { color: #fff; }
+[data-theme="light"] .sidebar-logo-sub   { color: rgba(255,255,255,0.45); }
+[data-theme="light"] .activity-feed { background: #f8fafc; border-color: rgba(0,0,0,0.08); }
+[data-theme="light"] .ws-feed        { background: #f8fafc; }
+[data-theme="light"] .alert-info { background: rgba(0,100,200,0.06); border-color: rgba(0,100,200,0.18); color: #1e3a5f; }
+
+/* ══════════════════════════════════════════════════════════════
+   FOUNDER VAULT
+   ══════════════════════════════════════════════════════════════ */
+.founder-vault-card {
+  border-color: rgba(0,212,255,0.25) !important;
+  background: linear-gradient(135deg, rgba(0,212,255,0.03), rgba(138,43,226,0.02)) !important;
+}
+.vault-badge {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--green); background: rgba(0,255,153,0.08); border: 1px solid rgba(0,255,153,0.2);
+  border-radius: 99px; padding: 3px 12px;
+}
+.vault-identity {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 2px;
+  margin: 18px 0;
+  background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px; overflow: hidden;
+}
+.vault-id-row {
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.vault-id-row:last-child { border-bottom: none; }
+.vault-id-label { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; width: 52px; flex-shrink: 0; }
+.vault-id-value { font-size: 13px; font-weight: 500; color: var(--text); }
+
+.vault-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 18px;
+}
+.vault-tab {
+  padding: 7px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: transparent; border: 1px solid rgba(255,255,255,0.07);
+  color: var(--text-muted); cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.vault-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.vault-tab.active {
+  background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.3);
+  color: var(--cyan);
+}
+.vault-panel { animation: fadeUp 0.2s ease; }
+.vault-save-btn {
+  margin-top: 14px; padding: 10px 28px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  border: none; border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: #fff; font-family: inherit;
+  transition: all 0.2s; box-shadow: 0 0 20px rgba(0,212,255,0.15);
+}
+.vault-save-btn:hover { box-shadow: 0 0 30px rgba(0,212,255,0.3); transform: translateY(-1px); }
+.vault-status {
+  font-size: 12px; margin-top: 8px; min-height: 18px; font-weight: 600;
+}
+
+/* OTP buttons shared */
+.otp-send-btn {
+  flex-shrink: 0; height: 44px; padding: 0 18px;
+  background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+  color: var(--cyan); border-radius: 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  font-family: inherit; transition: all 0.2s;
+}
+.otp-send-btn:hover:not(:disabled) { background: rgba(0,212,255,0.16); }
+.otp-send-btn:disabled { opacity: 0.4; cursor: default; }
+.otp-verify-btn {
+  flex-shrink: 0; height: 44px; padding: 0 18px;
+  background: var(--cyan); color: #000; border: none; border-radius: 10px;
+  font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+  transition: all 0.2s;
+}
+.otp-verify-btn:hover:not(:disabled) { opacity: 0.85; }
+.otp-verify-btn:disabled { opacity: 0.4; cursor: default; }
+
+[data-theme="light"] .founder-vault-card { border-color: rgba(0,85,204,0.2) !important; }
+[data-theme="light"] .vault-identity { background: rgba(0,0,0,0.04); }
+[data-theme="light"] .vault-tab { color: var(--text-muted); }
+[data-theme="light"] .vault-tab.active { color: var(--cyan); }

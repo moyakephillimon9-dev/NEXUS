@@ -1,167 +1,248 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NEXUS — First-Time Setup</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>NEXUS — Founder Setup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
   <style>
-    .setup-steps { display: flex; gap: 8px; margin-bottom: 32px; justify-content: center; }
+    .setup-page {
+      min-height: 100vh;
+      background: radial-gradient(ellipse 90% 60% at 50% -10%, rgba(0,80,200,0.18) 0%, transparent 70%), var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 32px 16px;
+    }
+    .setup-card {
+      width: 100%; max-width: 560px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 44px 44px 36px;
+      box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 60px rgba(0,212,255,0.06);
+    }
+    @media (max-width: 600px) { .setup-card { padding: 28px 20px; } }
+
+    /* Logo block */
+    .setup-logo {
+      display: flex; align-items: center; justify-content: center; gap: 18px;
+      margin-bottom: 32px;
+    }
+    .setup-logo-img {
+      width: 68px; height: 68px; object-fit: cover;
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(0,212,255,0.35), 0 0 60px rgba(138,43,226,0.2);
+    }
+    .setup-logo-text { text-align: left; }
+    .setup-logo-name {
+      font-size: 26px; font-weight: 800; letter-spacing: 4px;
+      background: linear-gradient(135deg, #00d4ff, #8a2be2);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1;
+    }
+    .setup-logo-sub {
+      font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
+      text-transform: uppercase; margin-top: 4px;
+    }
+    .setup-logo-badge {
+      font-size: 9.5px; letter-spacing: 2px; color: var(--cyan);
+      background: rgba(0,212,255,0.07); border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 99px; padding: 2px 10px; margin-top: 6px; display: inline-block;
+    }
+
+    /* Progress */
+    .setup-steps { display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; }
     .step {
-      width: 28px; height: 4px; border-radius: 99px;
-      background: rgba(255,255,255,0.1);
-      transition: background 0.3s;
+      flex: 1; height: 3px; border-radius: 99px;
+      background: rgba(255,255,255,0.07); transition: background 0.3s;
     }
-    .step.active   { background: var(--blue); }
+    .step.active   { background: var(--cyan); }
     .step.complete { background: var(--green); }
-    .setup-banner {
-      background: rgba(0,212,255,0.06); border: 1px solid var(--blue-border);
-      border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
-      font-size: 13px; color: #80e8ff; line-height: 1.6;
-    }
-    .setup-banner strong { color: var(--blue); }
 
-    /* Phone OTP widget */
+    /* Heading */
+    .setup-heading { font-size: 22px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .setup-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+
+    /* Security banner */
+    .security-banner {
+      display: flex; align-items: flex-start; gap: 14px;
+      background: rgba(0,212,255,0.05); border: 1px solid rgba(0,212,255,0.15);
+      border-radius: 12px; padding: 14px 18px; margin-bottom: 28px;
+    }
+    .security-banner-icon {
+      width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+      background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2);
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .security-banner-text { font-size: 12.5px; color: var(--text-mid); line-height: 1.6; }
+    .security-banner-text strong { color: var(--cyan); font-weight: 700; }
+
+    /* Form */
+    .form-section-title {
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1.5px;
+      margin: 24px 0 14px; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+
+    /* Phone OTP */
     .phone-row { display: flex; gap: 10px; align-items: flex-end; }
-    .phone-row .form-group { flex: 1; }
-    .send-otp-btn {
-      flex-shrink: 0; padding: 0 18px; height: 44px;
-      background: rgba(0,212,255,0.1); border: 1px solid var(--blue-border);
-      color: var(--blue); border-radius: 10px; font-size: 12px; font-weight: 600;
-      cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    .phone-row .form-group { flex: 1; margin: 0; }
+    .otp-btn {
+      flex-shrink: 0; height: 44px; padding: 0 18px;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+      color: var(--cyan); border-radius: 10px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      white-space: nowrap; transition: all 0.2s; font-family: inherit;
     }
-    .send-otp-btn:hover:not(:disabled) { background: rgba(0,212,255,0.2); }
-    .send-otp-btn:disabled { opacity: 0.45; cursor: default; }
-
-    .otp-row {
-      display: none; gap: 10px; align-items: flex-end; margin-top: 12px;
-    }
+    .otp-btn:hover:not(:disabled) { background: rgba(0,212,255,0.16); }
+    .otp-btn:disabled { opacity: 0.4; cursor: default; }
+    .otp-row { display: none; gap: 10px; align-items: flex-end; margin-top: 10px; }
     .otp-row.visible { display: flex; }
-    .otp-input {
-      letter-spacing: 8px; font-size: 20px; font-weight: 700;
-      text-align: center;
+    .otp-code-input {
+      letter-spacing: 10px; font-size: 20px; font-weight: 800; text-align: center;
     }
     .verify-btn {
-      flex-shrink: 0; padding: 0 18px; height: 44px;
-      background: var(--blue); color: #000;
-      border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
-      cursor: pointer; transition: all 0.2s;
+      flex-shrink: 0; height: 44px; padding: 0 18px;
+      background: var(--cyan); color: #000;
+      border: none; border-radius: 10px;
+      font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+      transition: all 0.2s;
     }
     .verify-btn:hover:not(:disabled) { opacity: 0.85; }
-    .verify-btn:disabled { opacity: 0.45; cursor: default; }
-
-    .phone-status {
-      font-size: 12px; margin-top: 6px; min-height: 18px; transition: all 0.2s;
-    }
-    .phone-status.ok  { color: var(--green, #00ff88); }
-    .phone-status.err { color: #ff4d6d; }
-    .phone-status.info{ color: var(--blue); }
-
+    .verify-btn:disabled { opacity: 0.4; cursor: default; }
+    .phone-status { font-size: 12px; margin-top: 6px; min-height: 18px; }
+    .phone-status.ok   { color: var(--green); }
+    .phone-status.err  { color: var(--red); }
+    .phone-status.info { color: var(--cyan); }
     .verified-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3);
-      color: #00ff88; border-radius: 99px; padding: 3px 10px; font-size: 11px;
-      font-weight: 600; margin-top: 6px;
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(0,255,153,0.08); border: 1px solid rgba(0,255,153,0.25);
+      color: var(--green); border-radius: 99px; padding: 2px 10px;
+      font-size: 11px; font-weight: 700; margin-top: 5px;
     }
 
-    /* Countdown */
-    #otp-countdown { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+    /* Submit */
+    .setup-submit {
+      margin-top: 28px; width: 100%; height: 52px;
+      background: linear-gradient(135deg, #00d4ff, #8a2be2);
+      border: none; border-radius: 13px; cursor: pointer;
+      font-size: 14px; font-weight: 800; color: #fff;
+      letter-spacing: 1px; text-transform: uppercase;
+      font-family: inherit; transition: all 0.3s;
+      box-shadow: 0 0 30px rgba(0,212,255,0.25);
+    }
+    .setup-submit:hover { box-shadow: 0 0 45px rgba(0,212,255,0.4); transform: translateY(-1px); }
+    .setup-submit:active { transform: translateY(0); }
+
+    .setup-footer {
+      margin-top: 20px; text-align: center;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .setup-footer span { color: var(--text-mid); }
   </style>
 </head>
 <body>
-<div class="auth-page" style="background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,80,200,0.15), transparent), var(--bg);">
-
-  <div class="auth-card" style="max-width: 540px;">
+<div class="setup-page">
+  <div class="setup-card">
 
     <!-- Logo -->
-    <div class="auth-logo">
-      <img src="{{ url_for('static', filename='img/nexus-mark.svg') }}" class="auth-logo-icon" alt="NEXUS">
-      <div class="auth-logo-text">
-        <div class="auth-logo-title" style="letter-spacing:3px">NEXUS</div>
-        <div class="auth-logo-sub">AI Operating System</div>
+    <div class="setup-logo">
+      <img src="{{ url_for('static', filename='img/nexus-logo.jpg') }}"
+           class="setup-logo-img" alt="NEXUS">
+      <div class="setup-logo-text">
+        <div class="setup-logo-name">NEXUS</div>
+        <div class="setup-logo-sub">AI Operating System</div>
+        <div class="setup-logo-badge">N X S</div>
       </div>
     </div>
 
-    <!-- Progress dots -->
+    <!-- Progress -->
     <div class="setup-steps">
-      <div class="step active" id="dot1"></div>
-      <div class="step" id="dot2"></div>
-      <div class="step" id="dot3"></div>
-      <div class="step" id="dot4"></div>
+      <div class="step active"   id="dot1"></div>
+      <div class="step"          id="dot2"></div>
+      <div class="step"          id="dot3"></div>
+      <div class="step"          id="dot4"></div>
     </div>
 
-    <div class="auth-heading">Welcome, Founder.</div>
-    <div class="auth-subheading">Set up your private NEXUS instance. This information is stored securely and never shared.</div>
+    <div class="setup-heading">Welcome, Founder.</div>
+    <div class="setup-sub">Create your private NEXUS instance. Credentials are encrypted and stored locally — only you will ever have access.</div>
 
     {% if error %}
-    <div class="alert alert-error mb-16">
-      <span>⚠</span> {{ error }}
-    </div>
+    <div class="alert alert-error mb-16"><span>⚠</span> {{ error }}</div>
     {% endif %}
 
-    <div class="setup-banner">
-      <strong>🔐 Private & Secure</strong><br>
-      NEXUS is your private AI Operating System. Only you will have access.
-      Your credentials are encrypted and stored locally.
+    <!-- Security banner -->
+    <div class="security-banner">
+      <div class="security-banner-icon">🔐</div>
+      <div class="security-banner-text">
+        <strong>Private &amp; Encrypted</strong><br>
+        Your password is hashed with bcrypt and never stored in plain text. Phone numbers are verified via OTP. No data leaves your server.
+      </div>
     </div>
 
     <form method="POST" action="{{ url_for('setup') }}" id="setup-form">
 
+      <div class="form-section-title">Identity</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Full Name *</label>
-          <input type="text" name="full_name" class="form-input" placeholder="Moyake Phillimon" required autofocus>
+          <label class="form-label">Full Name <span style="color:var(--red)">*</span></label>
+          <input type="text" name="full_name" class="form-input" placeholder="Your full name" required autofocus>
         </div>
         <div class="form-group">
-          <label class="form-label">Company / Brand Name</label>
+          <label class="form-label">Brand / Company</label>
           <input type="text" name="company" class="form-input" placeholder="NEXUS">
         </div>
       </div>
 
+      <div class="form-section-title">Login Credentials</div>
       <div class="form-group">
-        <label class="form-label">Email Address *</label>
+        <label class="form-label">Email Address <span style="color:var(--red)">*</span></label>
         <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required>
       </div>
+      <div class="form-row" style="margin-top:14px;">
+        <div class="form-group">
+          <label class="form-label">Password <span style="color:var(--red)">*</span></label>
+          <input type="password" name="password" id="pw1" class="form-input"
+                 placeholder="Min. 8 characters" required minlength="8"
+                 oninput="checkPw()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password <span style="color:var(--red)">*</span></label>
+          <input type="password" name="password2" id="pw2" class="form-input"
+                 placeholder="Repeat password" required
+                 oninput="checkPw()">
+        </div>
+      </div>
+      <div id="pw-status" style="font-size:12px;margin-top:5px;min-height:16px;"></div>
 
-      <!-- Phone + OTP verification -->
-      <div class="form-group" style="margin-top:16px;">
+      <div class="form-section-title">Contact &amp; Region</div>
+
+      <!-- Phone + OTP -->
+      <div class="form-group">
         <label class="form-label">
           Phone Number
           <span id="verified-badge" class="verified-badge" style="display:none;">✓ Verified</span>
         </label>
-
         <div class="phone-row">
-          <div class="form-group" style="margin:0;flex:1;">
-            <input type="tel" name="phone" id="phone-input" class="form-input"
-              placeholder="+1 000 000 0000"
-              oninput="onPhoneChange()">
-          </div>
-          <button type="button" class="send-otp-btn" id="send-otp-btn"
-            onclick="sendOTP()" disabled>
-            Send Code
-          </button>
+          <div class="form-group"><input type="tel" name="phone" id="phone-input" class="form-input"
+            placeholder="+1 000 000 0000" oninput="onPhoneChange()"></div>
+          <button type="button" class="otp-btn" id="send-otp-btn" onclick="sendOTP()" disabled>Send Code</button>
         </div>
-
-        <!-- OTP entry row -->
         <div class="otp-row" id="otp-row">
           <div class="form-group" style="margin:0;flex:1;">
-            <input type="text" id="otp-input" class="form-input otp-input"
-              maxlength="6" placeholder="——————"
-              oninput="onOtpInput(this)">
+            <input type="text" id="otp-input" class="form-input otp-code-input"
+                   maxlength="6" placeholder="——————" oninput="onOtpInput(this)">
           </div>
-          <button type="button" class="verify-btn" id="verify-btn"
-            onclick="verifyOTP()" disabled>
-            Verify
-          </button>
+          <button type="button" class="verify-btn" id="verify-btn" onclick="verifyOTP()" disabled>Verify</button>
         </div>
-
         <div class="phone-status" id="phone-status"></div>
-        <!-- Hidden field to pass verified phone to backend -->
         <input type="hidden" name="phone_verified" id="phone-verified-flag" value="0">
       </div>
 
-      <div class="form-row" style="margin-top:16px;">
+      <div class="form-row" style="margin-top:14px;">
         <div class="form-group">
           <label class="form-label">Country</label>
           <input type="text" name="country" class="form-input" placeholder="South Africa">
@@ -182,146 +263,93 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Secure Password *</label>
-          <input type="password" name="password" class="form-input" placeholder="Min. 8 characters" required minlength="8">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Confirm Password *</label>
-          <input type="password" name="password2" class="form-input" placeholder="Repeat password" required>
-        </div>
-      </div>
-
-      <button type="submit" class="btn btn-primary btn-lg w-full mt-8">
-        ⚡ Activate NEXUS
+      <button type="submit" class="setup-submit">
+        Activate NEXUS
       </button>
     </form>
+
+    <div class="setup-footer">
+      <span>NEXUS v0.1.0 — Private &amp; Secure</span> · Credentials stored locally
+    </div>
 
   </div>
 </div>
 
 <script>
-let otpSent      = false;
-let phoneVerified = false;
-let countdown    = null;
+let otpSent = false, phoneVerified = false, countdown = null;
+
+function checkPw() {
+  const a = document.getElementById('pw1').value;
+  const b = document.getElementById('pw2').value;
+  const el = document.getElementById('pw-status');
+  if (!b) { el.textContent = ''; return; }
+  if (a === b) { el.style.color = 'var(--green)'; el.textContent = '✓ Passwords match'; }
+  else { el.style.color = 'var(--red)'; el.textContent = '✗ Passwords do not match'; }
+}
 
 function onPhoneChange() {
   const val = document.getElementById('phone-input').value.trim();
-  const btn = document.getElementById('send-otp-btn');
-  btn.disabled = val.length < 7;
-  // Reset verification if phone changes
+  document.getElementById('send-otp-btn').disabled = val.length < 7;
   if (otpSent || phoneVerified) {
-    otpSent = false;
-    phoneVerified = false;
+    otpSent = false; phoneVerified = false;
     document.getElementById('otp-row').classList.remove('visible');
     document.getElementById('phone-verified-flag').value = '0';
     document.getElementById('verified-badge').style.display = 'none';
     setStatus('', '');
   }
 }
-
 function setStatus(msg, type) {
   const el = document.getElementById('phone-status');
-  el.textContent = msg;
-  el.className   = 'phone-status ' + (type || '');
+  el.textContent = msg; el.className = 'phone-status ' + (type || '');
 }
-
 async function sendOTP() {
   const phone = document.getElementById('phone-input').value.trim();
-  if (!phone) return;
-
   const btn = document.getElementById('send-otp-btn');
-  btn.disabled   = true;
-  btn.textContent = 'Sending…';
-  setStatus('Sending code…', 'info');
-
+  btn.disabled = true; btn.textContent = 'Sending…'; setStatus('Sending code…','info');
   try {
-    const res  = await fetch('/api/phone/send-otp', {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body   : JSON.stringify({ phone }),
-    });
+    const res = await fetch('/api/phone/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
     const data = await res.json();
-
     if (data.success) {
       otpSent = true;
       document.getElementById('otp-row').classList.add('visible');
       document.getElementById('otp-input').focus();
-      setStatus('Code sent! Check your SMS.', 'ok');
+      setStatus('Code sent — check your SMS.','ok');
       startCountdown(btn, 60);
-    } else {
-      setStatus('⚠ ' + data.error, 'err');
-      btn.disabled    = false;
-      btn.textContent = 'Send Code';
-    }
-  } catch (e) {
-    setStatus('⚠ Network error. Try again.', 'err');
-    btn.disabled    = false;
-    btn.textContent = 'Send Code';
-  }
+    } else { setStatus('⚠ '+data.error,'err'); btn.disabled=false; btn.textContent='Send Code'; }
+  } catch(e) { setStatus('⚠ Network error.','err'); btn.disabled=false; btn.textContent='Send Code'; }
 }
-
 function startCountdown(btn, secs) {
   if (countdown) clearInterval(countdown);
   let s = secs;
   btn.textContent = `Resend (${s}s)`;
-  countdown = setInterval(() => {
+  countdown = setInterval(()=>{
     s--;
-    if (s <= 0) {
-      clearInterval(countdown);
-      btn.disabled    = false;
-      btn.textContent = 'Resend Code';
-    } else {
-      btn.textContent = `Resend (${s}s)`;
-    }
+    if (s<=0){clearInterval(countdown);btn.disabled=false;btn.textContent='Resend Code';}
+    else btn.textContent = `Resend (${s}s)`;
   }, 1000);
 }
-
 function onOtpInput(el) {
-  // Only allow digits
-  el.value = el.value.replace(/\D/g, '');
+  el.value = el.value.replace(/\D/g,'');
   document.getElementById('verify-btn').disabled = el.value.length < 6;
 }
-
 async function verifyOTP() {
   const phone = document.getElementById('phone-input').value.trim();
   const code  = document.getElementById('otp-input').value.trim();
-  if (!phone || code.length < 6) return;
-
-  const btn      = document.getElementById('verify-btn');
-  btn.disabled   = true;
-  btn.textContent = 'Verifying…';
-  setStatus('Verifying…', 'info');
-
+  const btn   = document.getElementById('verify-btn');
+  btn.disabled=true; btn.textContent='Verifying…'; setStatus('Verifying…','info');
   try {
-    const res  = await fetch('/api/phone/verify-otp', {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body   : JSON.stringify({ phone, code }),
-    });
+    const res = await fetch('/api/phone/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
     const data = await res.json();
-
     if (data.success) {
       phoneVerified = true;
       document.getElementById('phone-verified-flag').value = '1';
       document.getElementById('otp-row').classList.remove('visible');
       document.getElementById('verified-badge').style.display = 'inline-flex';
-      setStatus('✓ Phone number verified!', 'ok');
+      setStatus('✓ Phone verified!','ok');
       if (countdown) clearInterval(countdown);
-    } else {
-      setStatus('⚠ ' + data.error, 'err');
-      btn.disabled    = false;
-      btn.textContent = 'Verify';
-    }
-  } catch (e) {
-    setStatus('⚠ Network error.', 'err');
-    btn.disabled    = false;
-    btn.textContent = 'Verify';
-  }
+    } else { setStatus('⚠ '+data.error,'err'); btn.disabled=false; btn.textContent='Verify'; }
+  } catch(e) { setStatus('⚠ Network error.','err'); btn.disabled=false; btn.textContent='Verify'; }
 }
 </script>
-
-<script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
 </body>
 </html>

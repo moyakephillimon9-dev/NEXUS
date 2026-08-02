@@ -1,84 +1,142 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NEXUS — Login</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
   <style>
-    .login-visual {
-      text-align: center; margin-bottom: 32px;
+    .login-page {
+      min-height: 100vh;
+      background: radial-gradient(ellipse 70% 50% at 50% -5%, rgba(0,60,180,0.2), transparent), var(--bg);
+      display: flex; align-items: center; justify-content: center; padding: 24px 16px;
     }
-    .login-glow {
-      width: 72px; height: 72px;
-      background: linear-gradient(135deg, #00d4ff, #0055ff);
-      border-radius: 20px; margin: 0 auto 16px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 32px;
-      box-shadow: 0 0 40px rgba(0,212,255,0.45), 0 0 80px rgba(0,100,255,0.2);
-      animation: glow-pulse 3s infinite;
+    .login-card {
+      width: 100%; max-width: 420px;
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 24px; padding: 48px 40px 40px;
+      box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 60px rgba(0,212,255,0.06);
+    }
+    @media (max-width: 500px) { .login-card { padding: 32px 22px; } }
+
+    /* Logo */
+    .login-logo {
+      display: flex; flex-direction: column; align-items: center;
+      margin-bottom: 36px; gap: 0;
+    }
+    .login-logo-img-wrap {
+      position: relative; width: 84px; height: 84px; margin-bottom: 18px;
+    }
+    .login-logo-img {
+      width: 84px; height: 84px; border-radius: 20px; object-fit: cover;
+      box-shadow: 0 0 40px rgba(0,212,255,0.4), 0 0 80px rgba(138,43,226,0.2);
+      display: block;
+    }
+    .login-logo-glow {
+      position: absolute; inset: -8px; border-radius: 26px;
+      background: radial-gradient(ellipse, rgba(0,212,255,0.15), transparent 70%);
+      animation: glow-pulse 3s ease-in-out infinite;
+      pointer-events: none;
     }
     @keyframes glow-pulse {
-      0%,100% { box-shadow: 0 0 40px rgba(0,212,255,0.45), 0 0 80px rgba(0,100,255,0.2); }
-      50%      { box-shadow: 0 0 60px rgba(0,212,255,0.65), 0 0 100px rgba(0,100,255,0.3); }
+      0%,100% { opacity: 0.7; transform: scale(1); }
+      50%      { opacity: 1;   transform: scale(1.05); }
     }
-    .login-title    { font-size: 26px; font-weight: 700; letter-spacing: 3px; }
-    .login-subtitle { font-size: 12px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
-    .divider-line {
-      display: flex; align-items: center; gap: 12px; margin: 28px 0;
-      color: var(--text-muted); font-size: 12px;
+    .login-brand {
+      font-size: 28px; font-weight: 800; letter-spacing: 5px;
+      background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-    .divider-line::before,.divider-line::after {
-      content: ''; flex: 1; height: 1px; background: var(--border);
+    .login-brand-sub {
+      font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-muted); margin-top: 5px;
     }
+
+    /* Heading */
+    .login-heading { font-size: 20px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+    .login-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+
+    /* Input icon */
+    .input-icon-wrap { position: relative; }
+    .input-icon-wrap .form-input { padding-left: 42px; }
+    .input-icon-wrap .iicon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; pointer-events: none; color: var(--text-muted);
+    }
+
+    /* Submit */
+    .login-submit {
+      margin-top: 24px; width: 100%; height: 52px;
+      background: linear-gradient(135deg, #00d4ff, #8a2be2);
+      border: none; border-radius: 13px; cursor: pointer;
+      font-size: 14px; font-weight: 800; color: #fff;
+      letter-spacing: 1px; text-transform: uppercase;
+      font-family: inherit; transition: all 0.3s;
+      box-shadow: 0 0 30px rgba(0,212,255,0.25);
+    }
+    .login-submit:hover { box-shadow: 0 0 50px rgba(0,212,255,0.4); transform: translateY(-1px); }
+    .login-submit:active { transform: translateY(0); }
+
+    .login-divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-muted); font-size: 11px; margin: 24px 0 16px;
+    }
+    .login-divider::before, .login-divider::after {
+      content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06);
+    }
+    .login-footer { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.6; }
   </style>
 </head>
 <body>
-<div class="auth-page" style="background: radial-gradient(ellipse 70% 45% at 50% -5%, rgba(0,60,180,0.18), transparent), var(--bg);">
+<div class="login-page">
+  <div class="login-card">
 
-  <div class="auth-card">
-
-    <div class="login-visual">
-      <img src="{{ url_for('static', filename='img/nexus-mark.svg') }}" style="width:52px;height:52px;margin:0 auto;" alt="NEXUS">
-      <div class="login-title">NEXUS</div>
-      <div class="login-subtitle">AI Operating System</div>
+    <!-- Logo -->
+    <div class="login-logo">
+      <div class="login-logo-img-wrap">
+        <div class="login-logo-glow"></div>
+        <img src="{{ url_for('static', filename='img/nexus-logo.jpg') }}"
+             class="login-logo-img" alt="NEXUS">
+      </div>
+      <div class="login-brand">NEXUS</div>
+      <div class="login-brand-sub">AI Operating System &nbsp;·&nbsp; N X S</div>
     </div>
 
-    <div class="auth-heading">Welcome back, Founder.</div>
-    <div class="auth-subheading">Sign in to your private NEXUS instance.</div>
+    <div class="login-heading">Welcome back, Founder.</div>
+    <div class="login-sub">Sign in to your private NEXUS instance.</div>
 
     {% if error %}
-    <div class="alert alert-error mb-16">
-      <span>⚠</span> {{ error }}
-    </div>
+    <div class="alert alert-error mb-16"><span>⚠</span> {{ error }}</div>
     {% endif %}
 
     <form method="POST" action="{{ url_for('login') }}">
       <div class="form-group">
         <label class="form-label">Email Address</label>
-        <div class="input-group">
-          <span class="input-icon">✉</span>
-          <input type="email" name="email" class="form-input" placeholder="founder@nexus.ai" required autofocus>
+        <div class="input-icon-wrap">
+          <span class="iicon">✉</span>
+          <input type="email" name="email" class="form-input"
+                 placeholder="founder@nexus.ai" required autofocus>
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-top:16px;">
         <label class="form-label">Password</label>
-        <div class="input-group">
-          <span class="input-icon">🔑</span>
-          <input type="password" name="password" class="form-input" placeholder="Your secure password" required>
+        <div class="input-icon-wrap">
+          <span class="iicon">🔑</span>
+          <input type="password" name="password" class="form-input"
+                 placeholder="Your secure password" required>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg w-full mt-8">
-        ⚡ Enter NEXUS
-      </button>
+      <button type="submit" class="login-submit">Enter NEXUS</button>
     </form>
 
-    <div class="divider-line">Secured by NEXUS Auth</div>
-    <p style="font-size:12px;color:var(--text-muted);text-align:center;">
-      NEXUS is a private system. Unauthorised access is prohibited.
-    </p>
+    <div class="login-divider">Secured by NEXUS Auth</div>
+    <div class="login-footer">
+      NEXUS is a private system. Unauthorised access is prohibited.<br>
+      <span style="color:var(--cyan);opacity:0.6;">v0.1.0</span>
+    </div>
 
   </div>
 </div>

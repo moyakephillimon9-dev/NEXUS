@@ -12,17 +12,140 @@
 </div>
 
 {% if saved %}
-<div class="alert alert-success mb-16">
-  <span>✓</span> Settings saved successfully.
-</div>
+<div class="alert alert-success mb-16"><span>✓</span> Settings saved successfully.</div>
 {% endif %}
 
-<form method="POST" action="{{ url_for('settings') }}">
 <div style="display:flex;flex-direction:column;gap:20px;">
 
-  <!-- AI Provider -->
+  <!-- ══ FOUNDER VAULT ══════════════════════════════════════════ -->
+  <div class="card founder-vault-card">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
+      <div class="vault-icon-wrap">
+        <img src="{{ url_for('static', filename='img/nexus-logo.jpg') }}"
+             style="width:46px;height:46px;border-radius:11px;object-fit:cover;box-shadow:0 0 20px rgba(0,212,255,0.3);" alt="NEXUS">
+      </div>
+      <div>
+        <div class="card-title" style="margin:0;">🔐 Founder Vault</div>
+        <div class="card-subtitle" style="margin:0;">Manage your private login credentials</div>
+      </div>
+      <div style="margin-left:auto;">
+        <span class="vault-badge">Encrypted</span>
+      </div>
+    </div>
+
+    <!-- Current identity summary -->
+    <div class="vault-identity">
+      <div class="vault-id-row">
+        <span class="vault-id-label">Name</span>
+        <span class="vault-id-value">{{ owner.get('full_name','—') }}</span>
+      </div>
+      <div class="vault-id-row">
+        <span class="vault-id-label">Email</span>
+        <span class="vault-id-value">{{ owner.get('email','—') }}</span>
+      </div>
+      <div class="vault-id-row">
+        <span class="vault-id-label">Phone</span>
+        <span class="vault-id-value">
+          {{ owner.get('phone','Not set') }}
+          {% if owner.get('phone_verified') %}
+          <span style="color:var(--green);font-size:11px;margin-left:6px;">✓ Verified</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="vault-id-row">
+        <span class="vault-id-label">Role</span>
+        <span class="vault-id-value" style="color:var(--cyan);">{{ (owner.get('role','founder') or 'Founder') | title }}</span>
+      </div>
+    </div>
+
+    <!-- Update tabs -->
+    <div class="vault-tabs">
+      <button class="vault-tab active" onclick="switchVaultTab('email',this)">Change Email</button>
+      <button class="vault-tab" onclick="switchVaultTab('password',this)">Change Password</button>
+      <button class="vault-tab" onclick="switchVaultTab('name',this)">Change Name</button>
+      <button class="vault-tab" onclick="switchVaultTab('phone',this)">Change Phone</button>
+    </div>
+
+    <!-- TAB: Email -->
+    <div class="vault-panel" id="vault-email">
+      <div class="form-group">
+        <label class="form-label">New Email Address</label>
+        <input type="email" id="v-new-email" class="form-input" placeholder="new@nexus.ai">
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Current Password (to confirm)</label>
+        <input type="password" id="v-email-pw" class="form-input" placeholder="Your current password">
+      </div>
+      <button class="vault-save-btn" onclick="vaultUpdate('email')">Update Email</button>
+      <div class="vault-status" id="vault-email-status"></div>
+    </div>
+
+    <!-- TAB: Password -->
+    <div class="vault-panel" id="vault-password" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Current Password</label>
+        <input type="password" id="v-old-pw" class="form-input" placeholder="Current password">
+      </div>
+      <div class="form-row" style="margin-top:12px;">
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" id="v-new-pw" class="form-input" placeholder="Min. 8 characters" oninput="vaultCheckPw()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" id="v-new-pw2" class="form-input" placeholder="Repeat new password" oninput="vaultCheckPw()">
+        </div>
+      </div>
+      <div id="vault-pw-match" style="font-size:12px;margin:6px 0;min-height:16px;"></div>
+      <button class="vault-save-btn" onclick="vaultUpdate('password')">Update Password</button>
+      <div class="vault-status" id="vault-password-status"></div>
+    </div>
+
+    <!-- TAB: Name -->
+    <div class="vault-panel" id="vault-name" style="display:none;">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="v-new-name" class="form-input" placeholder="Your full name"
+                 value="{{ owner.get('full_name','') }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Brand / Company</label>
+          <input type="text" id="v-new-company" class="form-input" placeholder="NEXUS"
+                 value="{{ owner.get('company','') }}">
+        </div>
+      </div>
+      <button class="vault-save-btn" onclick="vaultUpdate('name')">Update Name</button>
+      <div class="vault-status" id="vault-name-status"></div>
+    </div>
+
+    <!-- TAB: Phone -->
+    <div class="vault-panel" id="vault-phone" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">New Phone Number</label>
+        <div style="display:flex;gap:10px;align-items:flex-end;">
+          <input type="tel" id="v-new-phone" class="form-input" placeholder="+1 000 000 0000"
+                 style="flex:1;" oninput="document.getElementById('v-phone-send-btn').disabled=this.value.trim().length<7;">
+          <button class="otp-send-btn" id="v-phone-send-btn" onclick="vaultSendOTP()" disabled>Send Code</button>
+        </div>
+      </div>
+      <div id="v-phone-otp-row" style="display:none;margin-top:10px;">
+        <div style="display:flex;gap:10px;align-items:flex-end;">
+          <input type="text" id="v-phone-otp" class="form-input"
+                 style="flex:1;letter-spacing:8px;font-size:18px;font-weight:800;text-align:center;"
+                 maxlength="6" placeholder="——————"
+                 oninput="this.value=this.value.replace(/\D/g,'');document.getElementById('v-phone-verify-btn').disabled=this.value.length<6;">
+          <button class="otp-verify-btn" id="v-phone-verify-btn" onclick="vaultVerifyOTP()" disabled>Verify</button>
+        </div>
+      </div>
+      <div class="vault-status" id="vault-phone-status"></div>
+    </div>
+  </div>
+
+  <!-- ══ AI PROVIDER ════════════════════════════════════════════ -->
+  <form method="POST" action="{{ url_for('settings') }}">
   <div class="card">
-    <div class="card-title mb-4">🤖 AI Provider</div>
+    <div class="card-title mb-4">AI Provider</div>
     <div class="card-subtitle mb-20">Choose the AI engine powering NEXUS workers</div>
 
     <div class="form-group">
@@ -39,14 +162,14 @@
       <div class="form-group">
         <label class="form-label">OpenRouter Base URL</label>
         <input type="text" name="openrouter_base_url" class="form-input"
-          value="{{ nexus_settings.get('openrouter_base_url','https://openrouter.ai/api/v1') }}"
-          placeholder="https://openrouter.ai/api/v1">
+               value="{{ nexus_settings.get('openrouter_base_url','https://openrouter.ai/api/v1') }}"
+               placeholder="https://openrouter.ai/api/v1">
       </div>
       <div class="form-group">
         <label class="form-label">OpenRouter Model</label>
         <input type="text" name="openrouter_model" class="form-input"
-          value="{{ nexus_settings.get('openrouter_model','meta-llama/llama-3.1-8b-instruct:free') }}"
-          placeholder="meta-llama/llama-3.1-8b-instruct:free">
+               value="{{ nexus_settings.get('openrouter_model','meta-llama/llama-3.1-8b-instruct:free') }}"
+               placeholder="meta-llama/llama-3.1-8b-instruct:free">
       </div>
     </div>
 
@@ -54,14 +177,14 @@
       <div class="form-group">
         <label class="form-label">Ollama Host</label>
         <input type="text" name="ollama_host" class="form-input"
-          value="{{ nexus_settings.get('ollama_host','http://localhost:11434') }}"
-          placeholder="http://localhost:11434">
+               value="{{ nexus_settings.get('ollama_host','http://localhost:11434') }}"
+               placeholder="http://localhost:11434">
       </div>
       <div class="form-group">
         <label class="form-label">Ollama Model</label>
         <input type="text" name="ollama_model" class="form-input"
-          value="{{ nexus_settings.get('ollama_model','llama3.2') }}"
-          placeholder="llama3.2">
+               value="{{ nexus_settings.get('ollama_model','llama3.2') }}"
+               placeholder="llama3.2">
       </div>
     </div>
 
@@ -69,24 +192,41 @@
       <div class="form-group">
         <label class="form-label">Max Tokens</label>
         <input type="number" name="max_tokens" class="form-input"
-          value="{{ nexus_settings.get('max_tokens', 4096) }}" min="256" max="32768">
+               value="{{ nexus_settings.get('max_tokens', 4096) }}" min="256" max="32768">
       </div>
       <div class="form-group">
         <label class="form-label">Temperature</label>
         <input type="number" name="temperature" class="form-input"
-          value="{{ nexus_settings.get('temperature', 0.7) }}" min="0" max="2" step="0.1">
+               value="{{ nexus_settings.get('temperature', 0.7) }}" min="0" max="2" step="0.1">
       </div>
     </div>
 
     <div class="alert alert-info mt-8">
       <span>ℹ</span>
-      <div>API keys for OpenRouter should be stored as Replit Secrets (OPENROUTER_API_KEY) for security. Never paste keys directly into settings fields.</div>
+      <div>Store API keys as Replit Secrets (e.g. <strong>OPENROUTER_API_KEY</strong>). Never paste keys directly into settings fields.</div>
     </div>
   </div>
 
-  <!-- System -->
+  <!-- ══ APPEARANCE ════════════════════════════════════════════ -->
   <div class="card">
-    <div class="card-title mb-4">⚙️ System</div>
+    <div class="card-title mb-4">Appearance</div>
+    <div class="card-subtitle mb-20">Theme and display preferences</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+                background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:12px;">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);">Color Theme</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Switch between Dark (cyber) and Light mode</div>
+      </div>
+      <button type="button" class="theme-toggle-big" id="settings-theme-btn" onclick="NexusTheme.toggle()">
+        <span id="settings-theme-label">🌙 Dark</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ SYSTEM ═════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title mb-4">System</div>
     <div class="card-subtitle mb-20">General NEXUS behaviour</div>
 
     <div class="form-row">
@@ -104,9 +244,9 @@
     </div>
   </div>
 
-  <!-- Phone Verification -->
+  <!-- ══ PHONE VERIFICATION ═════════════════════════════════════ -->
   <div class="card">
-    <div class="card-title mb-4">📱 Phone Verification</div>
+    <div class="card-title mb-4">Phone Verification</div>
     <div class="card-subtitle mb-20">Verify your phone number via SMS for added security</div>
 
     {% if owner.get('phone_verified') %}
@@ -119,39 +259,28 @@
       <div class="form-group" style="flex:1;margin:0;">
         <label class="form-label">Phone Number</label>
         <input type="tel" id="settings-phone" class="form-input"
-          value="{{ owner.get('phone','') }}"
-          placeholder="+1 000 000 0000">
+               value="{{ owner.get('phone','') }}" placeholder="+1 000 000 0000">
       </div>
-      <button type="button" class="btn" id="settings-send-btn"
-        onclick="settingsSendOTP()"
-        style="height:44px;padding:0 18px;background:rgba(0,212,255,0.1);border:1px solid var(--blue-border);color:var(--blue);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
-        Send Code
-      </button>
+      <button type="button" class="otp-send-btn" id="settings-send-btn" onclick="settingsSendOTP()">Send Code</button>
     </div>
 
-    <div id="settings-otp-row" style="display:none;display:none;gap:10px;align-items:flex-end;margin-bottom:10px;">
+    <div id="settings-otp-row" style="display:none;gap:10px;align-items:flex-end;margin-bottom:10px;">
       <div class="form-group" style="flex:1;margin:0;">
         <input type="text" id="settings-otp-input" class="form-input"
-          maxlength="6" placeholder="6-digit code"
-          style="letter-spacing:6px;font-size:18px;font-weight:700;text-align:center;"
-          oninput="this.value=this.value.replace(/\D/g,'');document.getElementById('settings-verify-btn').disabled=this.value.length<6;">
+               maxlength="6" placeholder="6-digit code"
+               style="letter-spacing:6px;font-size:18px;font-weight:700;text-align:center;"
+               oninput="this.value=this.value.replace(/\D/g,'');document.getElementById('settings-verify-btn').disabled=this.value.length<6;">
       </div>
-      <button type="button" id="settings-verify-btn"
-        onclick="settingsVerifyOTP()" disabled
-        style="height:44px;padding:0 18px;background:var(--blue);color:#000;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
-        Verify
-      </button>
+      <button type="button" id="settings-verify-btn" class="otp-verify-btn" onclick="settingsVerifyOTP()" disabled>Verify</button>
     </div>
-
     <div id="settings-phone-status" style="font-size:12px;min-height:18px;"></div>
 
-    <!-- Test SMS -->
-    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Test SMS Alerts</div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;">Test SMS Alerts</div>
       <div style="display:flex;gap:10px;align-items:center;">
         <button type="button" id="test-sms-btn" onclick="testSMS()"
-          style="padding:0 20px;height:40px;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
-          ⚡ Send Test SMS
+          style="padding:0 20px;height:40px;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">
+          Send Test SMS
         </button>
         <span id="test-sms-status" style="font-size:12px;"></span>
       </div>
@@ -159,118 +288,198 @@
 
     <div class="alert alert-info mt-12">
       <span>ℹ</span>
-      <div>Requires <strong>TWILIO_ACCOUNT_SID</strong>, <strong>TWILIO_AUTH_TOKEN</strong>, and <strong>TWILIO_PHONE_NUMBER</strong> in Replit Secrets. SMS alerts fire automatically when builds complete and when revenue opportunities are detected in Reports.</div>
+      <div>Requires <strong>TWILIO_ACCOUNT_SID</strong>, <strong>TWILIO_AUTH_TOKEN</strong>, and <strong>TWILIO_PHONE_NUMBER</strong> in Replit Secrets.</div>
     </div>
   </div>
 
-  <!-- Security note -->
+  <!-- ══ SECURITY ═══════════════════════════════════════════════ -->
   <div class="card">
-    <div class="card-title mb-4">🔐 Security</div>
+    <div class="card-title mb-4">Security</div>
     <div class="card-subtitle mb-16">Owner access controls</div>
     <div class="alert alert-info">
       <span>🔒</span>
       <div>
         <strong>NEXUS requires Founder approval before:</strong><br>
-        Deploying applications · Sending messages · Spending money · Deleting files · Updating itself · Changing security settings.<br><br>
-        Full two-factor authentication and granular permissions are planned for NEXUS v0.2.
-        See the <a href="{{ url_for('roadmap') }}">Roadmap</a>.
+        Deploying apps · Sending messages · Spending money · Deleting files · Updating itself · Changing security settings.<br><br>
+        Full two-factor authentication and granular permissions are planned for NEXUS v0.2. See the <a href="{{ url_for('roadmap') }}">Roadmap</a>.
       </div>
     </div>
   </div>
 
   <div>
-    <button type="submit" class="btn btn-primary btn-lg">💾 Save Settings</button>
+    <button type="submit" class="btn btn-primary btn-lg">Save Settings</button>
   </div>
 
+  </form>
 </div>
-</form>
 
 <script>
-let settingsOtpSent = false;
+/* ── Vault tabs ───────────────────────────── */
+function switchVaultTab(name, btn) {
+  document.querySelectorAll('.vault-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.vault-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById('vault-' + name).style.display = 'block';
+}
 
-async function settingsSendOTP() {
-  const phone = document.getElementById('settings-phone').value.trim();
-  if (!phone) { setSettingsStatus('Enter a phone number first.', 'err'); return; }
+function setVaultStatus(section, msg, ok) {
+  const el = document.getElementById('vault-' + section + '-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+}
 
-  const btn = document.getElementById('settings-send-btn');
+function vaultCheckPw() {
+  const a  = document.getElementById('v-new-pw').value;
+  const b  = document.getElementById('v-new-pw2').value;
+  const el = document.getElementById('vault-pw-match');
+  if (!b) { el.textContent = ''; return; }
+  if (a === b) { el.style.color = 'var(--green)'; el.textContent = '✓ Passwords match'; }
+  else { el.style.color = 'var(--red)'; el.textContent = '✗ Passwords do not match'; }
+}
+
+async function vaultUpdate(type) {
+  let payload = { type };
+
+  if (type === 'email') {
+    payload.new_email    = document.getElementById('v-new-email').value.trim();
+    payload.current_password = document.getElementById('v-email-pw').value;
+    if (!payload.new_email || !payload.current_password) {
+      return setVaultStatus('email', '⚠ Fill in all fields.', false);
+    }
+  } else if (type === 'password') {
+    const np = document.getElementById('v-new-pw').value;
+    const np2 = document.getElementById('v-new-pw2').value;
+    if (np !== np2) return setVaultStatus('password', '⚠ Passwords do not match.', false);
+    payload.current_password = document.getElementById('v-old-pw').value;
+    payload.new_password = np;
+    if (!payload.current_password || np.length < 8) {
+      return setVaultStatus('password', '⚠ Password must be at least 8 characters.', false);
+    }
+  } else if (type === 'name') {
+    payload.full_name = document.getElementById('v-new-name').value.trim();
+    payload.company   = document.getElementById('v-new-company').value.trim();
+    if (!payload.full_name) return setVaultStatus('name', '⚠ Name cannot be empty.', false);
+  }
+
+  setVaultStatus(type, 'Saving…', true);
+
+  try {
+    const res  = await fetch('/api/founder/update-credentials', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setVaultStatus(type, '✓ ' + (data.message || 'Updated successfully.'), true);
+      if (type === 'email' || type === 'password') {
+        setTimeout(() => { window.location.href = '/login'; }, 1500);
+      }
+    } else {
+      setVaultStatus(type, '⚠ ' + data.error, false);
+    }
+  } catch (e) {
+    setVaultStatus(type, '⚠ Network error.', false);
+  }
+}
+
+/* ── Vault phone OTP ──────────────────────── */
+async function vaultSendOTP() {
+  const phone = document.getElementById('v-new-phone').value.trim();
+  const btn   = document.getElementById('v-phone-send-btn');
   btn.disabled = true; btn.textContent = 'Sending…';
-  setSettingsStatus('Sending code…', 'info');
-
-  const res  = await fetch('/api/phone/send-otp-auth', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ phone })
-  });
+  setVaultStatus('phone', 'Sending code…', true);
+  const res  = await fetch('/api/phone/send-otp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
   const data = await res.json();
   if (data.success) {
-    settingsOtpSent = true;
-    document.getElementById('settings-otp-row').style.display = 'flex';
-    document.getElementById('settings-otp-input').focus();
-    setSettingsStatus('Code sent! Check your SMS.', 'ok');
+    document.getElementById('v-phone-otp-row').style.display = 'flex';
+    setVaultStatus('phone', 'Code sent — check your SMS.', true);
     let s = 60;
-    const iv = setInterval(() => {
-      s--;
-      if (s <= 0) { clearInterval(iv); btn.disabled=false; btn.textContent='Resend Code'; }
-      else btn.textContent = `Resend (${s}s)`;
-    }, 1000);
+    const iv = setInterval(()=>{ s--; if(s<=0){clearInterval(iv);btn.disabled=false;btn.textContent='Resend';} else btn.textContent=`Resend (${s}s)`; }, 1000);
   } else {
-    setSettingsStatus('⚠ ' + data.error, 'err');
+    setVaultStatus('phone', '⚠ ' + data.error, false);
     btn.disabled = false; btn.textContent = 'Send Code';
+  }
+}
+async function vaultVerifyOTP() {
+  const phone = document.getElementById('v-new-phone').value.trim();
+  const code  = document.getElementById('v-phone-otp').value.trim();
+  const btn   = document.getElementById('v-phone-verify-btn');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  const res  = await fetch('/api/phone/verify-otp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
+  const data = await res.json();
+  if (data.success) {
+    setVaultStatus('phone', '✓ Phone verified and updated!', true);
+    document.getElementById('v-phone-otp-row').style.display = 'none';
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    setVaultStatus('phone', '⚠ ' + data.error, false);
+    btn.disabled = false; btn.textContent = 'Verify';
+  }
+}
+
+/* ── Settings phone OTP ───────────────────── */
+async function settingsSendOTP() {
+  const phone = document.getElementById('settings-phone').value.trim();
+  if (!phone) { document.getElementById('settings-phone-status').textContent = 'Enter a phone number first.'; return; }
+  const btn = document.getElementById('settings-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const res = await fetch('/api/phone/send-otp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('settings-otp-row').style.display = 'flex';
+    document.getElementById('settings-phone-status').style.color = 'var(--green)';
+    document.getElementById('settings-phone-status').textContent = 'Code sent — check your SMS.';
+    let s = 60;
+    const iv = setInterval(()=>{ s--; if(s<=0){clearInterval(iv);btn.disabled=false;btn.textContent='Resend Code';} else btn.textContent=`Resend (${s}s)`; },1000);
+  } else {
+    document.getElementById('settings-phone-status').style.color = 'var(--red)';
+    document.getElementById('settings-phone-status').textContent = '⚠ ' + data.error;
+    btn.disabled = false; btn.textContent = 'Send Code';
+  }
+}
+async function settingsVerifyOTP() {
+  const phone = document.getElementById('settings-phone').value.trim();
+  const code  = document.getElementById('settings-otp-input').value.trim();
+  const btn   = document.getElementById('settings-verify-btn');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  const res = await fetch('/api/phone/verify-otp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('settings-phone-status').style.color = 'var(--green)';
+    document.getElementById('settings-phone-status').textContent = '✓ Phone verified!';
+    document.getElementById('settings-otp-row').style.display = 'none';
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    document.getElementById('settings-phone-status').style.color = 'var(--red)';
+    document.getElementById('settings-phone-status').textContent = '⚠ ' + data.error;
+    btn.disabled = false; btn.textContent = 'Verify';
   }
 }
 
 async function testSMS() {
   const btn = document.getElementById('test-sms-btn');
   const st  = document.getElementById('test-sms-status');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  st.textContent = '';
-  st.style.color = 'var(--blue)';
-  st.textContent = 'Sending test message…';
-
+  btn.disabled = true; btn.textContent = 'Sending…'; st.textContent = '';
+  st.style.color = 'var(--cyan)'; st.textContent = 'Sending test message…';
   try {
-    const res  = await fetch('/api/sms/test', { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
-      st.style.color = '#00ff88';
-      st.textContent = '✓ Test SMS sent! Check your phone.';
-    } else {
-      st.style.color = '#ff4d6d';
-      st.textContent = '⚠ ' + data.error;
-    }
-  } catch (e) {
-    st.style.color = '#ff4d6d';
-    st.textContent = '⚠ Network error.';
-  }
-  btn.disabled = false;
-  btn.textContent = '⚡ Send Test SMS';
+    const res = await fetch('/api/sms/test',{method:'POST'});
+    const d = await res.json();
+    if (d.success) { st.style.color='var(--green)'; st.textContent='✓ Test SMS sent!'; }
+    else { st.style.color='var(--red)'; st.textContent='⚠ '+d.error; }
+  } catch(e) { st.style.color='var(--red)'; st.textContent='⚠ Network error.'; }
+  btn.disabled = false; btn.textContent = 'Send Test SMS';
 }
 
-async function settingsVerifyOTP() {
-  const phone = document.getElementById('settings-phone').value.trim();
-  const code  = document.getElementById('settings-otp-input').value.trim();
-  const btn   = document.getElementById('settings-verify-btn');
-  btn.disabled = true; btn.textContent = 'Verifying…';
-  setSettingsStatus('Verifying…', 'info');
-
-  const res  = await fetch('/api/phone/verify-otp-auth', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ phone, code })
-  });
-  const data = await res.json();
-  if (data.success) {
-    setSettingsStatus('✓ Phone verified!', 'ok');
-    document.getElementById('settings-otp-row').style.display = 'none';
-    setTimeout(() => location.reload(), 1200);
-  } else {
-    setSettingsStatus('⚠ ' + data.error, 'err');
-    btn.disabled = false; btn.textContent = 'Verify';
-  }
+/* ── Settings theme sync ──────────────────── */
+function syncSettingsThemeLabel() {
+  const btn = document.getElementById('settings-theme-btn');
+  if (!btn) return;
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  document.getElementById('settings-theme-label').textContent = dark ? '🌙 Dark' : '☀️ Light';
 }
-
-function setSettingsStatus(msg, type) {
-  const el = document.getElementById('settings-phone-status');
-  el.textContent = msg;
-  el.style.color = type==='ok' ? '#00ff88' : type==='err' ? '#ff4d6d' : 'var(--blue)';
-}
+document.addEventListener('nexus-theme-changed', syncSettingsThemeLabel);
+syncSettingsThemeLabel();
 </script>
 {% endblock %}

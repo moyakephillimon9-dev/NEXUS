@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" id="html-root">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}NEXUS{% endblock %} — AI Operating System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
   {% block head %}{% endblock %}
@@ -16,7 +16,9 @@
   <!-- ── Sidebar ─────────────────────────────────── -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <img src="{{ url_for('static', filename='img/nexus-mark.svg') }}" alt="NEXUS" class="sidebar-logo-icon">
+      <img src="{{ url_for('static', filename='img/nexus-logo.jpg') }}"
+           alt="NEXUS" class="sidebar-logo-icon"
+           style="border-radius:10px;object-fit:cover;box-shadow:0 0 18px rgba(0,212,255,0.3);">
       <div class="sidebar-logo-text">
         <div class="sidebar-logo-title">NEXUS</div>
         <div class="sidebar-logo-sub">AI Operating System</div>
@@ -96,6 +98,12 @@
     </div>
     <div class="topbar-right">
       <div class="topbar-clock" id="nexus-clock">--:--:--</div>
+
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="theme-toggle" onclick="NexusTheme.toggle()" title="Toggle theme">
+        <span class="theme-icon" id="theme-icon">🌙</span>
+      </button>
+
       <div class="ai-status" id="ai-status">
         <div class="ai-dot"></div>
         <span class="ai-label">Online</span>

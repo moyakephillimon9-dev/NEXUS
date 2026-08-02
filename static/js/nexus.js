@@ -1,3 +1,38 @@
+/* ── NEXUS Theme Engine ─────────────────────────────────────────
+   Dark / Light toggle — persisted in localStorage as 'nexus-theme'
+   ─────────────────────────────────────────────────────────────── */
+const NexusTheme = (() => {
+  const KEY = 'nexus-theme';
+
+  function apply(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = theme === 'light' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    document.dispatchEvent(new CustomEvent('nexus-theme-changed', { detail: theme }));
+  }
+
+  function init() {
+    const saved = localStorage.getItem(KEY) || 'dark';
+    apply(saved);
+  }
+
+  function toggle() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next    = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(KEY, next);
+    apply(next);
+  }
+
+  // Apply immediately to avoid flash of wrong theme
+  (() => {
+    const saved = localStorage.getItem(KEY) || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+
+  document.addEventListener('DOMContentLoaded', init);
+  return { toggle, apply, init };
+})();
+
 /* ═══════════════════════════════════════════════════════
    NEXUS — Main JavaScript v2.0
    ═══════════════════════════════════════════════════════ */
