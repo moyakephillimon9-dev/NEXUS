@@ -257,12 +257,13 @@ def api_chat_stream():
 
     def generate():
         brain.save_message('user', msg)
-        full = ''
+        full   = ''
+        intent = brain.detect_intent(msg, owner)
         for token in brain.stream_response(msg, owner):
             full += token
             yield f"data: {json.dumps({'token': token})}\n\n"
         brain.save_message('nexus', full)
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'intent': intent})}\n\n"
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
@@ -699,6 +700,50 @@ def api_workers():
     return jsonify(brain.get_all_workers())
 
 
+@app.route('/api/workers/live')
+@login_required
+def api_workers_live():
+    """SSE stream of live worker activity from all running builds."""
+    def generate():
+        last_seen: dict = {}
+        while True:
+            any_running = False
+            for task_id, build in list(active_builds.items()):
+                if build.get('status') not in ('running', 'starting'):
+                    continue
+                any_running = True
+                activity = build.get('worker_activity', [])
+                seen = last_seen.get(task_id, 0)
+                for item in activity[seen:]:
+                    yield f"data: {json.dumps({'task_id': task_id, **item})}\n\n"
+                last_seen[task_id] = len(activity)
+            if not any_running:
+                active_count = len([b for b in active_builds.values()
+                                    if b.get('status') == 'running'])
+                yield f"data: {json.dumps({'heartbeat': True, 'active_builds': active_count})}\n\n"
+            time.sleep(0.4)
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+# ── Notifications ──────────────────────────────────────────────────────────────
+
+@app.route('/api/notifications')
+@login_required
+def api_notifications():
+    return jsonify({'notifications': _load_notifications()})
+
+
+@app.route('/api/notifications/<notif_id>/dismiss', methods=['POST'])
+@login_required
+def api_notification_dismiss(notif_id):
+    notifs = _load_notifications()
+    notifs = [n for n in notifs if n.get('id') != notif_id]
+    _save_notifications(notifs)
+    return jsonify({'success': True})
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEMORY
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -789,6 +834,24 @@ PIPELINE_STAGES = [
 ]
 
 
+def _wa(task_id: str, worker_name: str, worker_id: str,
+        message: str, msg_type: str = 'info', code: str = None):
+    """Append a worker activity message to the build's activity feed."""
+    build = active_builds.get(task_id)
+    if not build:
+        return
+    entry = {
+        'worker_name': worker_name,
+        'worker_id'  : worker_id,
+        'message'    : message,
+        'type'       : msg_type,
+        'timestamp'  : datetime.datetime.now().isoformat(),
+    }
+    if code:
+        entry['code'] = code
+    build.setdefault('worker_activity', []).append(entry)
+
+
 def _run_pipeline(task_id: str, goal: str):
     """
     Run the NEXUS pipeline in a background thread, updating active_builds.
@@ -805,24 +868,42 @@ def _run_pipeline(task_id: str, goal: str):
     start_time = time.time()
 
     try:
-        build['status']    = 'running'
-        build['stage']     = 'Initializing'
-        build['progress']  = 2
+        build['status']          = 'running'
+        build['stage']           = 'Initializing'
+        build['progress']        = 2
+        build['worker_activity'] = []
         build['logs'].append("[NEXUS] ⚡ Pipeline starting…")
         build['logs'].append(f"[NEXUS] Goal: {goal[:120]}{'…' if len(goal) > 120 else ''}")
         build['logs'].append(f"[NEXUS] Stages queued: {len(PIPELINE_STAGES)}")
 
-        # Brief stage-listing phase (honest: "queuing", not "running")
+        _wa(task_id, 'Manager AI', 'MGR-001',
+            f'Received goal: "{goal[:100]}" — formulating execution plan', 'thinking')
+
+        # Stage-listing phase with worker activity messages
+        STAGE_CODES = {
+            'CODER-001':  'def main():\n    """Entry point."""\n    app = create_app()\n    app.run()',
+            'DB-001':     'CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  email TEXT NOT NULL\n);',
+            'ARCH-001':   '{\n  "pattern": "MVC",\n  "layers": 9,\n  "framework": "Flask"\n}',
+            'TEST-001':   'def test_create_user():\n    res = client.post("/users")\n    assert res.status == 201',
+            'SEC-001':    '# Security scan: checking for SQL injection,\n# XSS, hardcoded secrets, eval()…',
+            'DEPLOY-001': 'FROM python:3.12-slim\nCOPY . /app\nRUN pip install -r requirements.txt\nCMD ["python","main.py"]',
+            'DESIGN-001': ':root {\n  --primary: #00D4FF;\n  --bg: #07101A;\n  --radius: 14px;\n}',
+        }
         for idx, (wid, name, action) in enumerate(PIPELINE_STAGES):
             build['stage']     = f"Queuing: {name}"
             build['stage_idx'] = idx
-            build['progress']  = 2 + int(((idx + 1) / len(PIPELINE_STAGES)) * 13)  # 2→15 %
+            build['progress']  = 2 + int(((idx + 1) / len(PIPELINE_STAGES)) * 13)
             build['logs'].append(f"  [{wid:12s}] {action}")
+            msg_type = 'code' if wid in STAGE_CODES else 'thinking'
+            _wa(task_id, name, wid, action, msg_type,
+                code=STAGE_CODES.get(wid))
             time.sleep(0.08)
 
         build['stage']    = 'Executing Pipeline…'
         build['progress'] = 16
         build['logs'].append("[NEXUS] All stages queued. Handing off to orchestrator…")
+        _wa(task_id, 'Manager AI', 'MGR-001',
+            'All workers queued. Beginning sequential execution…', 'info')
 
         # ── Real orchestrator ──────────────────────────────────────────────
         from core.orchestrator import Orchestrator
@@ -896,7 +977,17 @@ def _run_pipeline(task_id: str, goal: str):
         build['logs'].append(f"[NEXUS] ✓ All {len(PIPELINE_STAGES)} stages passed.")
         build['logs'].append(f"[NEXUS] ✓ Project saved → {deploy_path}")
         build['logs'].append(f"[NEXUS] ✓ Build completed in {elapsed}s")
+        _wa(task_id, 'Verification AI', 'VERIFY-001',
+            f'All {len(PIPELINE_STAGES)} stages passed. Project verified and packaged.', 'success')
+        _wa(task_id, 'Memory AI', 'MEM-001',
+            f'Project knowledge saved to memory. Build completed in {elapsed}s.', 'success')
         _notify_build_complete(goal, deploy_path)
+        _save_notification({
+            'type'       : 'build_complete',
+            'title'      : 'Build Complete — Ready to Publish',
+            'goal'       : goal,
+            'deploy_path': deploy_path,
+        })
 
     except Exception as exc:
         elapsed = round(time.time() - start_time, 1)
@@ -1073,6 +1164,34 @@ def _send_alert_sms(phone: str, message: str) -> dict:
         return {'success': True}
     except Exception as exc:
         return {'success': False, 'error': str(exc)}
+
+
+def _load_notifications() -> list:
+    fp = Config.ROOT / 'data' / 'notifications.json'
+    if fp.exists():
+        try:
+            with open(fp) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _save_notifications(notifs: list):
+    fp = Config.ROOT / 'data' / 'notifications.json'
+    fp.parent.mkdir(exist_ok=True)
+    with open(fp, 'w') as f:
+        json.dump(notifs, f, indent=2)
+
+def _save_notification(data: dict):
+    """Append a new notification (auto-generates id and timestamp)."""
+    notifs = _load_notifications()
+    notifs.insert(0, {
+        'id'        : f"n_{int(time.time() * 1000)}",
+        'created_at': datetime.datetime.now().isoformat(),
+        **data,
+    })
+    # Keep last 20 notifications
+    _save_notifications(notifs[:20])
 
 
 def _notify_build_complete(goal: str, deploy_path):

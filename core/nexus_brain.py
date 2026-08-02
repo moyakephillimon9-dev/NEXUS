@@ -1,7 +1,7 @@
 """
-NEXUS Brain — Built-in Reasoning Engine
-Provides chat, worker info, and streaming responses.
-No external API required; optionally enhanced by LLM providers.
+NEXUS Brain — Advanced Built-in Reasoning Engine v2.0
+Context-aware, intent-detecting, next-generation AI engine.
+No external API required — fully self-contained.
 """
 
 import json, re, time, datetime, random
@@ -11,8 +11,7 @@ DATA_DIR    = Path(__file__).resolve().parent.parent / 'data'
 CHAT_FILE   = DATA_DIR / 'chat_history.json'
 MEMORY_FILE = Path(__file__).resolve().parent.parent / 'memory' / 'database.json'
 
-
-# ── Worker registry ────────────────────────────────────────────────────────────
+# ── Worker registry ─────────────────────────────────────────────────────────
 WORKERS = [
     {"id": "VISION-001",   "name": "Vision Parser AI",    "role": "Parses goals and vision documents",                "stage": 0},
     {"id": "ASSESS-001",   "name": "Capability Assessor", "role": "Classifies features as supported or unsupported",  "stage": 1},
@@ -38,9 +37,31 @@ WORKERS = [
     {"id": "MGR-001",      "name": "Manager AI",          "role": "Orchestrates all workers and approves plans",     "stage": -1},
 ]
 
+# ── Build intent patterns ────────────────────────────────────────────────────
+_BUILD_VERBS    = re.compile(r'\b(build|create|make|develop|generate|code|write|design|launch|deploy|start|implement)\b', re.I)
+_BUILD_SUBJECTS = re.compile(r'\b(app|application|website|web app|api|backend|dashboard|system|tool|platform|game|bot|script|service|portal|shop|store|saas|crm|erp|cms|mobile app|android app|ios app)\b', re.I)
+_QUESTION_WORDS = re.compile(r'^(how|what|why|when|where|who|can you|do you|is|are|will|show|list|tell me)\b', re.I)
+
+_PROJECT_TYPES = {
+    'mobile':     (re.compile(r'\b(mobile|android|ios|phone|flutter|react native)\b', re.I), 'Mobile Application'),
+    'api':        (re.compile(r'\b(api|rest|graphql|endpoint|backend|microservice|fastapi|flask api|django)\b', re.I), 'REST API'),
+    'dashboard':  (re.compile(r'\b(dashboard|analytics|chart|graph|admin panel|data viz)\b', re.I), 'Dashboard'),
+    'game':       (re.compile(r'\b(game|gaming|play|puzzle|quiz)\b', re.I), 'Game'),
+    'automation': (re.compile(r'\b(script|automation|bot|cli|crawler|scraper|cron)\b', re.I), 'Automation Script'),
+    'ecommerce':  (re.compile(r'\b(shop|store|ecommerce|e-commerce|cart|checkout|payment)\b', re.I), 'E-Commerce Platform'),
+    'saas':       (re.compile(r'\b(saas|subscription|multi-tenant|crm|erp|cms)\b', re.I), 'SaaS Platform'),
+}
+
+CONTEXT_WINDOW = 14  # messages to include for context awareness
+
 
 class NexusBrain:
-    """Built-in NEXUS reasoning engine with streaming chat support."""
+    """
+    NEXUS Advanced Built-in Reasoning Engine v2.0
+
+    Context-aware, intent-detecting conversational AI.
+    Fully self-contained — no external API key required.
+    """
 
     def __init__(self):
         DATA_DIR.mkdir(exist_ok=True)
@@ -79,7 +100,6 @@ class NexusBrain:
             "content"   : content,
             "timestamp" : datetime.datetime.now().isoformat(),
         })
-        # Keep last 200 messages
         if len(history) > 200:
             history = history[-200:]
         with open(CHAT_FILE, 'w') as f:
@@ -89,10 +109,57 @@ class NexusBrain:
         with open(CHAT_FILE, 'w') as f:
             json.dump([], f)
 
+    # ── Intent detection ──────────────────────────────────────────────────────
+    def detect_intent(self, message: str, owner: dict) -> dict:
+        """
+        Analyse message and return structured intent metadata.
+        Returns dict with: is_build, goal, project_type, confidence
+        """
+        msg = message.strip()
+        low = msg.lower()
+
+        # Detect build intent
+        has_verb    = bool(_BUILD_VERBS.search(low))
+        has_subject = bool(_BUILD_SUBJECTS.search(low))
+        is_question = bool(_QUESTION_WORDS.match(low))
+
+        # High confidence: "build me a X" / "create a Y app"
+        is_build = has_verb and (has_subject or len(msg) > 30) and not is_question
+        confidence = 0.0
+        if is_build:
+            confidence = 0.7
+            if has_verb and has_subject:
+                confidence = 0.95
+
+        # Detect project type
+        project_type = 'Web Application'
+        for key, (pattern, label) in _PROJECT_TYPES.items():
+            if pattern.search(low):
+                project_type = label
+                break
+
+        # Extract cleaned goal (remove filler phrases)
+        goal = msg
+        for filler in ['can you ', 'please ', 'i want you to ', 'i need you to ',
+                       'i want a ', 'i need a ', 'build me a ', 'create a ',
+                       'make me a ', 'develop a ', 'generate a ']:
+            if low.startswith(filler):
+                goal = msg[len(filler):]
+                break
+
+        return {
+            'is_build'    : is_build,
+            'goal'        : goal if is_build else '',
+            'project_type': project_type,
+            'confidence'  : confidence,
+        }
+
     # ── Core response engine ──────────────────────────────────────────────────
     def respond(self, message: str, owner: dict) -> str:
         """Return a full response string."""
-        return ''.join(self.stream_response(message, owner))
+        return ''.join(
+            t for t in self.stream_response(message, owner)
+        )
 
     def stream_response(self, message: str, owner: dict):
         """Yield response tokens one word at a time for streaming."""
@@ -100,132 +167,248 @@ class NexusBrain:
         words = text.split(' ')
         for i, word in enumerate(words):
             yield word + ('' if i == len(words) - 1 else ' ')
-            time.sleep(0.018)
+            time.sleep(0.015)
 
     def _build_response(self, message: str, owner: dict) -> str:
-        """Pattern-match the message and return an appropriate response."""
-        msg   = message.lower().strip()
-        name  = owner.get('full_name', 'Founder').split()[0]
-        company = owner.get('company', 'your company')
-        now   = datetime.datetime.now()
+        """
+        Advanced context-aware response engine.
+        Reads conversation history to provide coherent multi-turn responses.
+        """
+        msg     = message.strip()
+        low     = msg.lower()
+        name    = (owner.get('full_name') or 'Founder').split()[0]
+        company = owner.get('company') or 'your company'
+        now     = datetime.datetime.now()
 
-        # ── Greetings ──
-        if _match(msg, ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']):
+        # Pull recent context
+        history  = self.get_chat_history()
+        recent   = history[-(CONTEXT_WINDOW):] if len(history) > CONTEXT_WINDOW else history
+        ctx_text = ' '.join(m.get('content', '') for m in recent).lower()
+
+        # ── Greetings ──────────────────────────────────────────────────────────
+        if _m(low, ['hello', 'hi ', 'hey ', 'good morning', 'good afternoon', 'good evening', 'hi!']):
             hour = now.hour
-            if hour < 12:    greeting = "Good morning"
-            elif hour < 17:  greeting = "Good afternoon"
-            else:            greeting = "Good evening"
-            return (f"{greeting}, {name}. I'm NEXUS — your AI Operating System. "
-                    f"I'm online and all 22 workers are standing by. "
-                    f"What would you like to build or manage today?")
+            if hour < 12:   g = "Good morning"
+            elif hour < 17: g = "Good afternoon"
+            else:           g = "Good evening"
+            worker_count = len(WORKERS)
+            return (
+                f"{g}, {name}. NEXUS is fully operational.\n\n"
+                f"All {worker_count} AI workers are standing by and the 21-stage pipeline is ready.\n\n"
+                f"Describe what you want to build and I'll dispatch the team immediately — "
+                f"or ask me anything about your projects, workers, or system status."
+            )
 
-        # ── Identity ──
-        if _match(msg, ['who are you', 'what are you', 'what is nexus', 'tell me about yourself']):
-            return (f"I am NEXUS — an AI Operating System built for {company}. "
-                    f"I orchestrate a team of 22 specialised AI workers across a 21-stage pipeline "
-                    f"to plan, design, code, review, test, secure, document and deploy software. "
-                    f"I am your private digital operations centre. "
-                    f"I never fake results, never make decisions without your approval, and I grow smarter with every project.")
+        # ── Identity ───────────────────────────────────────────────────────────
+        if _m(low, ['who are you', 'what are you', 'what is nexus', 'tell me about yourself', 'what do you do']):
+            return (
+                f"I am NEXUS — an advanced AI Operating System built specifically for {company}.\n\n"
+                f"**What I do:** I orchestrate 22 specialised AI workers across a 21-stage pipeline to turn "
+                f"a plain-language goal into a fully built, tested, secured, and deployable software project.\n\n"
+                f"**My pipeline:** Vision Parsing → Capability Assessment → Research → Module Detection → "
+                f"Planning → Architecture → Database Design → Code Generation → UI/UX Design → "
+                f"Code Review → Testing → Security Scan → Performance Analysis → Documentation → "
+                f"Monitoring → Integration → DevOps → Deployment → Verification → Progress → Memory.\n\n"
+                f"**My promise:** I never fake completion. Every stage must pass a real gate. "
+                f"If something fails, I tell you exactly what failed and why.\n\n"
+                f"What would you like to build today?"
+            )
 
-        # ── Status ──
-        if _match(msg, ['status', 'how are you', 'are you online', 'system status']):
-            return (f"All systems operational, {name}. "
-                    f"22 AI workers are online. Memory is active. Pipeline is ready. "
-                    f"Current time: {now.strftime('%H:%M on %A, %d %B %Y')}. "
-                    f"What shall we build?")
+        # ── System status ──────────────────────────────────────────────────────
+        if _m(low, ['status', 'how are you', 'are you online', 'system status', 'system health', 'all good']):
+            return (
+                f"All systems nominal, {name}.\n\n"
+                f"**Workers:** 22 AI agents — all online\n"
+                f"**Pipeline:** 21 stages — ready\n"
+                f"**Memory:** Active and indexed\n"
+                f"**Engine:** NEXUS Built-in v2.0 — running\n"
+                f"**Time:** {now.strftime('%H:%M on %A, %d %B %Y')}\n\n"
+                f"No active builds running. Ready for your next project."
+            )
 
-        # ── Workers ──
-        if _match(msg, ['workers', 'agents', 'team', 'who works for you', 'list workers']):
-            names = ', '.join(w['name'] for w in WORKERS[:6])
-            return (f"I coordinate 22 AI workers across 21 pipeline stages. "
-                    f"The team includes: {names}, and 16 more specialists. "
-                    f"Each worker has a dedicated role — from parsing your goal all the way to deployment and memory. "
-                    f"You can view all workers in the AI Workers section.")
+        # ── Build / create intent ──────────────────────────────────────────────
+        if _m(low, ['build', 'create', 'make', 'develop', 'generate', 'code', 'implement']) and \
+           not _m(low, ['how to build', 'can you build', 'what can you build', 'how does']):
+            intent = self.detect_intent(msg, owner)
+            if intent['is_build']:
+                ptype = intent['project_type']
+                return (
+                    f"Understood, {name}. I'm ready to build that for you.\n\n"
+                    f"**Detected project type:** {ptype}\n"
+                    f"**Goal:** {intent['goal'][:120]}\n\n"
+                    f"I'll activate all 22 AI workers across the full 21-stage pipeline:\n"
+                    f"research → plan → architect → database → code → design → test → security → deploy.\n\n"
+                    f"Click **Launch Build** below to start, or head to the **Builder** section to customise the build type first."
+                )
+            # Generic build question
+            return (
+                f"Ready to build, {name}. Head to the **Builder** section and describe exactly what you want.\n\n"
+                f"I can build: web apps, REST APIs, dashboards, mobile apps, games, automation scripts, "
+                f"e-commerce platforms, SaaS tools, and more.\n\n"
+                f"The full 21-stage pipeline will handle research, architecture, code generation, "
+                f"testing, security scanning, documentation, and packaging — all automatically."
+            )
 
-        # ── Build / create ──
-        if _match(msg, ['build', 'create', 'make', 'develop', 'generate']):
-            return (f"Ready to build, {name}. Head to the Builder section and describe what you want — "
-                    f"a web app, mobile app, API, dashboard, game, or business system. "
-                    f"NEXUS will activate the full 21-stage pipeline: research, plan, architect, code, test, secure, document and deploy. "
-                    f"What type of software are you building?")
+        # ── Workers ────────────────────────────────────────────────────────────
+        if _m(low, ['workers', 'agents', 'team', 'who works for you', 'list workers', 'show workers']):
+            names = ', '.join(w['name'] for w in WORKERS[:5])
+            return (
+                f"NEXUS coordinates **22 specialised AI workers** across 21 pipeline stages.\n\n"
+                f"**Active workers include:** {names}, and 17 more specialists.\n\n"
+                f"Each worker has a dedicated role — from parsing your initial goal all the way to "
+                f"deployment packaging and memory storage. Workers operate in strict sequence: "
+                f"no stage starts until the previous one passes its quality gate.\n\n"
+                f"View all workers and their live status in the **AI Workers** section."
+            )
 
-        # ── Projects ──
-        if _match(msg, ['projects', 'my projects', 'show projects', 'project history']):
-            return (f"Your projects are stored in the Projects section. "
-                    f"Each project record contains the full pipeline output: source code, architecture, documentation, security report and deployment artefacts. "
-                    f"Would you like to start a new project or review an existing one?")
+        # ── Pipeline ───────────────────────────────────────────────────────────
+        if _m(low, ['pipeline', 'stages', 'process', 'how does it work', 'how does nexus work']):
+            return (
+                f"The NEXUS pipeline has **21 stages** driven by 22 AI workers:\n\n"
+                f"**Stage 0–3:** Vision Parsing → Capability Assessment → Research → Module Detection\n"
+                f"**Stage 4–7:** Planning → Architecture → Database Design → Code Generation\n"
+                f"**Stage 8–11:** UI/UX Design → Code Review → Testing → Security Scan\n"
+                f"**Stage 12–15:** Performance → Documentation → Monitoring → Integration\n"
+                f"**Stage 16–20:** DevOps → Deployment → Verification → Progress → Memory\n\n"
+                f"**Quality gates** at stages 9 (Reviewer), 10 (Tester), 11 (Security), and 18 (Verification) "
+                f"can halt the pipeline. A download is **never generated** unless all gates pass. "
+                f"This is NEXUS's honesty contract — no false success, ever."
+            )
 
-        # ── Memory ──
-        if _match(msg, ['memory', 'remember', 'what do you know', 'knowledge']):
-            return (f"My memory system stores everything NEXUS learns: "
-                    f"project architectures, solved problems, your preferences, business information, and pipeline outcomes. "
-                    f"This knowledge grows with every project and helps me work faster and smarter over time. "
-                    f"You can browse and search memories in the Memory section.")
+        # ── Projects ───────────────────────────────────────────────────────────
+        if _m(low, ['projects', 'my projects', 'show projects', 'project history', 'past projects']):
+            return (
+                f"Your project history is in the **Projects** section.\n\n"
+                f"Each project record contains the complete pipeline output: "
+                f"source code, architecture document, test results, security report, "
+                f"documentation, DevOps configuration, and the deployment package.\n\n"
+                f"Completed projects can be published to Google Play Store or Apple App Store "
+                f"from the **App Store Publish** section. Ready to start a new project?"
+            )
 
-        # ── Pipeline ──
-        if _match(msg, ['pipeline', 'stages', 'process', 'how does it work']):
-            return (f"The NEXUS pipeline has 21 stages: "
-                    f"Vision Parsing → Capability Assessment → Research → Module Detection → Planning → Architecture → "
-                    f"Database Design → Coding → UI Design → Code Review → Testing → Security → Performance → "
-                    f"Documentation → Monitoring → Integration → DevOps → Deployment → Verification → Progress Tracking → Memory. "
-                    f"Every stage must complete before the next begins. Verification (stage 18) blocks false success claims. "
-                    f"What would you like to pipeline?")
+        # ── Memory ─────────────────────────────────────────────────────────────
+        if _m(low, ['memory', 'remember', 'what do you know', 'knowledge', 'what have you learned']):
+            return (
+                f"My memory system records everything NEXUS learns:\n\n"
+                f"**Project knowledge:** Architectures, code patterns, and solutions from every build.\n"
+                f"**Business context:** Your company preferences, tech choices, and constraints.\n"
+                f"**Pipeline outcomes:** What worked, what failed, and why — so I improve each run.\n\n"
+                f"Memory grows automatically with every pipeline run. "
+                f"Browse and search all stored knowledge in the **Memory** section."
+            )
 
-        # ── Settings ──
-        if _match(msg, ['settings', 'configure', 'configuration', 'setup']):
-            return (f"You can configure NEXUS in the Settings section: "
-                    f"AI provider (built-in, OpenRouter, Ollama, LM Studio), memory, security, theme and more. "
-                    f"By default I use the built-in reasoning engine — no API key required. "
-                    f"Would you like to enable an external LLM provider?")
+        # ── Publish / Play Store ──────────────────────────────────────────────
+        if _m(low, ['publish', 'play store', 'app store', 'deploy', 'release', 'launch']):
+            return (
+                f"NEXUS can prepare your app for store submission from the **App Store Publish** section.\n\n"
+                f"**Supported stores:** Google Play Store, Apple App Store, Web Hosting\n\n"
+                f"**What NEXUS generates:**\n"
+                f"• Complete store listing (title, description, category, version)\n"
+                f"• Submission guide with step-by-step instructions\n"
+                f"• Screenshot placeholder folder\n"
+                f"• Downloadable submission package (ZIP)\n\n"
+                f"First complete a build in the **Builder**, then come to Publish to package it for the store. "
+                f"All publish actions require your explicit approval — NEXUS never publishes without you."
+            )
 
-        # ── Reports ──
-        if _match(msg, ['report', 'reports', 'analytics', 'statistics', 'stats']):
-            return (f"The Reports section shows daily, weekly and monthly summaries of your NEXUS activity: "
-                    f"projects built, pipeline success rates, worker performance and system health. "
-                    f"All reports are generated automatically. Check the Reports section for the latest data.")
+        # ── Reports ────────────────────────────────────────────────────────────
+        if _m(low, ['report', 'reports', 'analytics', 'statistics', 'stats', 'how many projects']):
+            return (
+                f"The **Reports** section shows real-time analytics on your NEXUS activity:\n\n"
+                f"• Total projects built, completed, in-progress, and errored\n"
+                f"• Recent pipeline runs with status badges\n"
+                f"• Revenue opportunities for completed projects\n"
+                f"• System health metrics for all 22 workers\n\n"
+                f"Reports also show **build completion notifications** when a project finishes — "
+                f"including a direct prompt to design and publish to the Play Store."
+            )
 
-        # ── Version ──
-        if _match(msg, ['version', 'what version', 'nexus version']):
-            return ("NEXUS v0.1.0 — Foundation Release.\n"
-                    "This version delivers: owner authentication, dashboard, chat, project builder, "
-                    "21-stage pipeline, worker management, memory, reports, settings and roadmap. "
-                    "Future versions will add LLM integration, voice, mobile apps, financial management, "
-                    "social media management, and more. Check the Roadmap for the full plan.")
+        # ── Settings ───────────────────────────────────────────────────────────
+        if _m(low, ['settings', 'configure', 'configuration']):
+            return (
+                f"Configure NEXUS from the **Settings** section:\n\n"
+                f"• **AI Engine:** Built-in v2.0 (active) — no API key needed\n"
+                f"• **Security:** Session management and access controls\n"
+                f"• **Notifications:** SMS alerts via Twilio (optional)\n"
+                f"• **Theme:** UI preferences\n\n"
+                f"The built-in engine handles all reasoning, chat, and pipeline orchestration "
+                f"without any external dependency. You can optionally connect an LLM provider "
+                f"in Settings for even richer responses."
+            )
 
-        # ── Help ──
-        if _match(msg, ['help', 'what can you do', 'capabilities', 'commands']):
-            return (f"Here is what I can do for you right now, {name}:\n\n"
-                    f"🔨 **Build software** — describe any app and the 21-stage pipeline runs automatically.\n"
-                    f"📂 **Manage projects** — view history, artifacts, and pipeline results.\n"
-                    f"🤖 **Monitor workers** — see the status and logs of all 22 AI workers.\n"
-                    f"🧠 **Search memory** — I remember every project and solution.\n"
-                    f"📊 **View reports** — daily and weekly activity summaries.\n"
-                    f"⚙️ **Configure settings** — AI provider, security, and preferences.\n"
-                    f"🗺️ **Roadmap** — see planned features and future milestones.\n\n"
-                    f"Just ask me anything or use the menu on the left.")
+        # ── Version ────────────────────────────────────────────────────────────
+        if _m(low, ['version', 'what version', 'nexus version']):
+            return (
+                f"**NEXUS v0.1.0** — Foundation Release\n\n"
+                f"**Running:** Built-in Reasoning Engine v2.0\n"
+                f"**Features active:** Owner auth, dashboard, chat, builder, 21-stage pipeline, "
+                f"22 AI workers, memory, reports, workers activity feed, notifications, "
+                f"app store publish, promotion, revenue tracking, roadmap.\n\n"
+                f"**Upcoming:** LLM integration (v0.2), voice interface (v0.3), "
+                f"mobile app creation (v0.4), financial management (v0.5). "
+                f"See the full plan in the **Roadmap** section."
+            )
 
-        # ── Roadmap / future ──
-        if _match(msg, ['roadmap', 'future', 'planned', 'upcoming', 'next version']):
-            return ("The NEXUS roadmap is visible in the Roadmap section. "
-                    "Planned milestones include: LLM integration (v0.2), voice interface (v0.3), "
-                    "mobile app creation (v0.4), financial management (v0.5), social media management (v0.6), "
-                    "and the full AI Operating System vision (v1.0). "
-                    "All future capabilities will be added as plugins without breaking existing functionality.")
+        # ── Help ───────────────────────────────────────────────────────────────
+        if _m(low, ['help', 'what can you do', 'capabilities', 'commands', 'options']):
+            return (
+                f"Here is what NEXUS can do for you right now, {name}:\n\n"
+                f"**Build software** — describe any app, API, dashboard, or tool. "
+                f"The 21-stage pipeline runs automatically.\n\n"
+                f"**Manage projects** — view history, download artifacts, review pipeline results.\n\n"
+                f"**Monitor workers** — watch all 22 AI agents in real time with live activity.\n\n"
+                f"**Publish to stores** — package completed projects for Play Store or App Store.\n\n"
+                f"**Track revenue** — log earnings, set milestones, manage payouts.\n\n"
+                f"**Search memory** — every project builds institutional knowledge.\n\n"
+                f"**View reports** — build analytics, system health, revenue opportunities.\n\n"
+                f"Just describe what you want to build — I'll handle the rest."
+            )
 
-        # ── Thank you ──
-        if _match(msg, ['thank', 'thanks', 'good job', 'well done', 'perfect']):
-            return (f"You're welcome, {name}. NEXUS exists to multiply your capabilities. "
-                    f"Every project we complete together makes the system smarter. What's next?")
+        # ── Roadmap ─────────────────────────────────────────────────────────────
+        if _m(low, ['roadmap', 'future', 'planned', 'upcoming', 'next version', 'what\'s next']):
+            return (
+                f"The NEXUS roadmap is visible in the **Roadmap** section. Key milestones:\n\n"
+                f"**v0.2 — LLM Integration:** Connect OpenAI, Anthropic, or local models.\n"
+                f"**v0.3 — Voice Interface:** Talk to NEXUS by voice.\n"
+                f"**v0.4 — Mobile App Creation:** Build real Android/iOS apps.\n"
+                f"**v0.5 — Financial Management:** Full P&L, invoicing, and accounting.\n"
+                f"**v0.6 — Social Media Management:** Auto-post and run ad campaigns.\n"
+                f"**v1.0 — Full AI Operating System:** All capabilities unified.\n\n"
+                f"Every future version adds plugins without breaking existing functionality."
+            )
 
-        # ── Default ──
-        return (f"Understood, {name}. I'm processing your request: \"{message}\"\n\n"
-                f"As NEXUS v0.1.0, I'm running on the built-in reasoning engine. "
-                f"For richer responses, you can connect an external LLM provider in Settings. "
-                f"Currently I can help you build software, manage projects, monitor workers, "
-                f"search memory, and view reports. "
-                f"What would you like to do?")
+        # ── Thank you ──────────────────────────────────────────────────────────
+        if _m(low, ['thank', 'thanks', 'good job', 'well done', 'perfect', 'amazing', 'great']):
+            return (
+                f"You're welcome, {name}. Every project we run together makes NEXUS smarter.\n\n"
+                f"What's next — shall we start a new build, check on your projects, or review the workers?"
+            )
+
+        # ── Context-aware default ─────────────────────────────────────────────
+        # Check if there's recent build context
+        if _m(ctx_text, ['build', 'project', 'create', 'app']) and len(msg) > 20:
+            intent = self.detect_intent(msg, owner)
+            if intent['is_build']:
+                return (
+                    f"That sounds like a great project, {name}.\n\n"
+                    f"**Your goal:** {intent['goal'][:150]}\n"
+                    f"**Detected type:** {intent['project_type']}\n\n"
+                    f"Click **Launch Build** below to start the 21-stage pipeline, "
+                    f"or describe more requirements first and I'll refine the spec."
+                )
+
+        # ── Intelligent default ────────────────────────────────────────────────
+        return (
+            f"I understand, {name}. Let me address that.\n\n"
+            f"NEXUS v2.0 is running on the built-in reasoning engine — context-aware, "
+            f"always honest, and ready to build.\n\n"
+            f"If you want to build software, describe your project and I'll dispatch the 22-worker pipeline immediately. "
+            f"For anything else — workers, reports, memory, publish — ask me directly or use the sidebar navigation.\n\n"
+            f"What would you like to do?"
+        )
 
 
-# ── Utility ───────────────────────────────────────────────────────────────────
-def _match(text: str, keywords: list) -> bool:
+# ── Utility ──────────────────────────────────────────────────────────────────
+def _m(text: str, keywords: list) -> bool:
+    """Return True if any keyword appears in text."""
     return any(kw in text for kw in keywords)

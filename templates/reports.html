@@ -4,16 +4,20 @@
 {% block page_title %}Reports{% endblock %}
 
 {% block content %}
+
+<!-- ── Build completion notifications ─────────────────────────────────────── -->
+<div id="notifications-area"></div>
+
 <div class="section-header mb-24">
   <div>
     <div class="section-title">Reports</div>
     <div class="section-sub">Generated {{ report.generated_at }}</div>
   </div>
   <div style="display:flex;gap:10px;">
-    <button onclick="sendReportSMS()" class="btn btn-ghost btn-sm" id="sms-alert-btn" title="Send report summary to your phone">
-      📲 SMS Alert
+    <button onclick="sendReportSMS()" class="btn btn-ghost btn-sm" id="sms-alert-btn">
+      SMS Alert
     </button>
-    <a href="{{ url_for('reports') }}" class="btn btn-ghost btn-sm">↻ Refresh</a>
+    <a href="{{ url_for('reports') }}" class="btn btn-ghost btn-sm">Refresh</a>
   </div>
 </div>
 
@@ -55,17 +59,17 @@
   </div>
 </div>
 
-<!-- Revenue Opportunities (shown when completed projects exist) -->
+<!-- Revenue Opportunities -->
 {% if report.completed > 0 %}
 <div class="card mb-24" style="border-color:rgba(138,43,226,0.4);background:linear-gradient(135deg,rgba(138,43,226,0.05),rgba(0,212,255,0.03));">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
     <div>
-      <div class="card-title" style="color:#c084fc;">💰 Revenue Opportunities</div>
+      <div class="card-title" style="color:#c084fc;">Revenue Opportunities</div>
       <div class="card-subtitle">Projects ready to monetise and publish</div>
     </div>
     <button onclick="sendRevenueSMS()" class="btn btn-sm"
       style="background:rgba(138,43,226,0.15);border:1px solid rgba(138,43,226,0.4);color:#c084fc;font-size:11px;">
-      📲 Alert Me
+      SMS Alert
     </button>
   </div>
   <div style="display:flex;flex-direction:column;gap:10px;">
@@ -82,7 +86,7 @@
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
           <span class="badge badge-green">Deployable</span>
-          <a href="{{ url_for('builder') }}" class="btn btn-sm" style="font-size:11px;padding:3px 10px;">Publish →</a>
+          <a href="{{ url_for('publish') }}" class="btn btn-sm" style="font-size:11px;padding:5px 14px;">Publish →</a>
         </div>
       </div>
       {% endif %}
@@ -91,8 +95,8 @@
   <div class="alert alert-info mt-16" style="margin-bottom:0;">
     <span>🚀</span>
     <div>
-      <strong>Coming soon:</strong> One-click publish to Google Play Store, Apple App Store, and web hosting.
-      Auto-promotion via Google Ads and social media is on the <a href="{{ url_for('roadmap') }}">Roadmap</a>.
+      <strong>Ready:</strong> Package your completed projects for Google Play Store or Apple App Store
+      from the <a href="{{ url_for('publish') }}">App Store Publish</a> section.
     </div>
   </div>
 </div>
@@ -116,7 +120,7 @@
           </div>
         </div>
         {% set s = p.get('status', 'unknown') %}
-        <span class="badge {% if s in ('complete','DEPLOYED') %}badge-green{% elif s == 'error' %}badge-red{% else %}badge-blue{% endif %}">
+        <span class="badge {% if s in ('complete','DEPLOYED') %}badge-green{% elif s == 'error' %}badge-red{% else %}badge-cyan{% endif %}">
           {{ s | title }}
         </span>
       </div>
@@ -139,7 +143,7 @@
       ('AI Workers (22)',   'All Online',  100, 'green'),
       ('Memory System',     'Active',       95, 'green'),
       ('Plugin Registry',   'Loaded',      100, 'green'),
-      ('LLM Provider',      'Built-in',     60, 'blue'),
+      ('Built-in Engine v2', 'Running',     100, 'green'),
       ('Deployment Engine', 'Ready',        90, 'green'),
     ] %}
     {% for name, status, pct, color in metrics %}
@@ -164,54 +168,92 @@
 </div>
 
 <script>
+// Load pending build notifications
+async function loadNotifications() {
+  try {
+    const res  = await fetch('/api/notifications');
+    const data = await res.json();
+    const area = document.getElementById('notifications-area');
+    if (!area) return;
+    area.innerHTML = '';
+    (data.notifications || []).forEach(n => {
+      const card = document.createElement('div');
+      card.className = 'notif-card mb-16';
+      card.id = `notif-${n.id}`;
+      card.innerHTML = `
+        <div class="notif-inner">
+          <div class="notif-icon">✅</div>
+          <div class="notif-body">
+            <div class="notif-title">${escHtml(n.title)}</div>
+            <div class="notif-goal">${escHtml((n.goal||'').substring(0,100))}</div>
+            <div class="notif-time">${escHtml(n.created_at ? n.created_at.substring(0,16).replace('T',' ') : '')}</div>
+          </div>
+          <div class="notif-actions">
+            <a href="/publish" class="btn btn-primary btn-sm">Design &amp; Publish to Play Store</a>
+            <button class="btn btn-ghost btn-sm" onclick="dismissNotif('${n.id}')">Dismiss</button>
+          </div>
+        </div>`;
+      area.appendChild(card);
+    });
+  } catch(e) { /* silent */ }
+}
+
+async function dismissNotif(id) {
+  try {
+    await fetch(`/api/notifications/${id}/dismiss`, {method:'POST'});
+    const el = document.getElementById(`notif-${id}`);
+    if (el) { el.style.opacity='0'; el.style.transition='opacity 0.3s'; setTimeout(()=>el.remove(),300); }
+  } catch(e) {}
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 async function sendReportSMS() {
   const btn = document.getElementById('sms-alert-btn');
   btn.disabled = true;
-  btn.textContent = '📲 Sending…';
-
+  btn.textContent = 'Sending…';
   const stats = {
     total:     {{ report.total_projects }},
     completed: {{ report.completed }},
     errors:    {{ report.errors }},
   };
-  const msg = `📊 NEXUS Report — ${stats.completed}/${stats.total} projects complete, ${stats.errors} errors. Check dashboard for details.`;
-
+  const msg = `NEXUS Report — ${stats.completed}/${stats.total} projects complete, ${stats.errors} errors. Check dashboard for details.`;
   const res  = await fetch('/api/sms/alert', {
-    method : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({ message: msg }),
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ message: msg }),
   });
   const data = await res.json();
   showSMSFeedback(data.success, data.success ? 'Report sent to your phone.' : ('⚠ ' + data.error));
   btn.disabled = false;
-  btn.textContent = '📲 SMS Alert';
+  btn.textContent = 'SMS Alert';
 }
 
 async function sendRevenueSMS() {
   const projects = {{ report.recent | tojson }};
   const ready    = projects.filter(p => p.status === 'complete' || p.status === 'DEPLOYED');
   const names    = ready.slice(0,3).map(p => (p.goal || p.task_id || '?').substring(0,40)).join('; ');
-  const msg      = `💰 NEXUS Revenue Alert — ${ready.length} project(s) ready to publish: ${names}. Log in to deploy.`;
-
-  const res  = await fetch('/api/sms/alert', {
-    method : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({ message: msg }),
+  const msg      = `NEXUS Revenue Alert — ${ready.length} project(s) ready to publish: ${names}. Log in to deploy.`;
+  const res      = await fetch('/api/sms/alert', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ message: msg }),
   });
   const data = await res.json();
-  showSMSFeedback(data.success, data.success ? '💰 Revenue alert sent to your phone!' : ('⚠ ' + data.error));
+  showSMSFeedback(data.success, data.success ? 'Revenue alert sent to your phone!' : ('⚠ ' + data.error));
 }
 
 function showSMSFeedback(ok, msg) {
   const el  = document.getElementById('sms-feedback');
   const ico = document.getElementById('sms-feedback-icon');
   const txt = document.getElementById('sms-feedback-msg');
-  el.style.display   = 'flex';
-  el.className       = 'alert mb-16 ' + (ok ? 'alert-success' : 'alert-error');
-  ico.textContent    = ok ? '✓' : '⚠';
-  txt.textContent    = msg;
+  el.style.display = 'flex';
+  el.className     = 'alert mb-16 ' + (ok ? 'alert-success' : 'alert-error');
+  ico.textContent  = ok ? '✓' : '⚠';
+  txt.textContent  = msg;
   setTimeout(() => el.style.display = 'none', 5000);
 }
-</script>
 
+document.addEventListener('DOMContentLoaded', loadNotifications);
+</script>
 {% endblock %}
