@@ -1422,11 +1422,16 @@ class MemoryAI:
             Atomic replace.
         """
 
-        tmp_file = self.db_path.with_suffix(".tmp")
+        # NOTE: this method uses self.database_path (same attr as _atomic_save).
+        # An older revision used self.db_path which was never assigned → AttributeError.
+        tmp_file = self.database_path.with_suffix(".tmp")
 
         self._state_cache["manifest"]["last_sync"] = (
             datetime.now(timezone.utc).isoformat()
         )
+
+        # Ensure directory exists before writing
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             loop = asyncio.get_running_loop()
@@ -1438,22 +1443,22 @@ class MemoryAI:
                 self._state_cache
             )
 
-            if self.db_path.exists():
+            if self.database_path.exists():
 
                 backup_name = (
                     f"snapshot_{int(datetime.now().timestamp())}.bak"
                 )
 
-                backup_target = self.backup_dir / backup_name
+                backup_target = self.backup_path / backup_name
 
                 await loop.run_in_executor(
                     None,
                     shutil.copy2,
-                    self.db_path,
+                    self.database_path,
                     backup_target
                 )
 
-            os.replace(tmp_file, self.db_path)
+            os.replace(tmp_file, self.database_path)
 
             logger.info("💾 Memory database committed successfully.")
 
@@ -1468,7 +1473,7 @@ class MemoryAI:
                 tmp_file.unlink()
 
             with open(
-                self.db_path,
+                self.database_path,
                 "r",
                 encoding="utf-8"
             ) as restore:

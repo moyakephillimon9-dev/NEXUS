@@ -616,6 +616,71 @@ def api_revenue_alert_threshold():
     return jsonify({'success': True})
 
 
+@app.route('/api/revenue/payout-method', methods=['POST'])
+@login_required
+def api_revenue_payout_method():
+    """Save the owner's preferred payout method."""
+    data   = request.json or {}
+    method = data.get('method', '').strip()   # paypal | bank | stripe
+    detail = data.get('detail', '').strip()   # PayPal email / account number / Stripe ID
+    name   = data.get('name', '').strip()     # account holder name (bank)
+    if not method or not detail:
+        return jsonify({'success': False, 'error': 'Method and account detail are required.'}), 400
+    rev = _load_revenue_data()
+    rev['payout_method'] = {'method': method, 'detail': detail, 'name': name,
+                            'updated_at': datetime.datetime.now().isoformat()}
+    _save_revenue_data(rev)
+    return jsonify({'success': True})
+
+
+@app.route('/api/revenue/withdraw', methods=['POST'])
+@login_required
+def api_revenue_withdraw():
+    """Request a withdrawal to the saved payout method."""
+    data   = request.json or {}
+    amount = float(data.get('amount', 0))
+    rev    = _load_revenue_data()
+
+    payout_method = rev.get('payout_method')
+    if not payout_method:
+        return jsonify({'success': False, 'error': 'No payout method saved. Add one first.'}), 400
+
+    # Calculate available balance
+    earned    = sum(e.get('amount_usd', 0) for e in rev.get('entries', []))
+    withdrawn = sum(w.get('amount_usd', 0) for w in rev.get('withdrawals', [])
+                    if w.get('status') != 'rejected')
+    available = earned - withdrawn
+
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'Enter an amount greater than $0.'}), 400
+    if amount > available:
+        return jsonify({'success': False,
+                        'error': f'Insufficient balance. Available: ${available:.2f}'}), 400
+
+    withdrawal = {
+        'id'        : f"wd_{int(time.time()*1000)}",
+        'amount_usd': amount,
+        'method'    : payout_method['method'],
+        'detail'    : payout_method['detail'],
+        'status'    : 'pending',
+        'requested_at': datetime.datetime.now().isoformat(),
+        'note'      : data.get('note', '').strip(),
+    }
+    rev.setdefault('withdrawals', []).insert(0, withdrawal)
+    _save_revenue_data(rev)
+
+    # SMS confirmation
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    if phone:
+        _send_alert_sms(phone,
+            f"💸 NEXUS Withdrawal Request\n"
+            f"${amount:.2f} → {payout_method['method'].upper()} ({payout_method['detail'][:30]})\n"
+            f"Status: Pending. Log in to confirm."
+        )
+    return jsonify({'success': True, 'withdrawal': withdrawal, 'available': available - amount})
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # WORKERS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -725,52 +790,122 @@ PIPELINE_STAGES = [
 
 
 def _run_pipeline(task_id: str, goal: str):
-    """Run the NEXUS pipeline in a background thread, updating active_builds."""
-    build = active_builds[task_id]
+    """
+    Run the NEXUS pipeline in a background thread, updating active_builds.
+
+    Honesty contract
+    ─────────────────
+    • status='complete' is set ONLY when ALL 21 stages pass AND a deployment
+      folder exists on disk.
+    • status='error' is set for ANY gate halt, missing output, or exception.
+    • A download link is NEVER generated unless status='complete'.
+    • The exact failed stage, reason, and suggested fix are always surfaced.
+    """
+    build      = active_builds[task_id]
+    start_time = time.time()
+
     try:
-        build['status'] = 'running'
+        build['status']    = 'running'
+        build['stage']     = 'Initializing'
+        build['progress']  = 2
+        build['logs'].append("[NEXUS] ⚡ Pipeline starting…")
+        build['logs'].append(f"[NEXUS] Goal: {goal[:120]}{'…' if len(goal) > 120 else ''}")
+        build['logs'].append(f"[NEXUS] Stages queued: {len(PIPELINE_STAGES)}")
 
-        # Stage-by-stage progress updates (real orchestrator runs underneath)
+        # Brief stage-listing phase (honest: "queuing", not "running")
         for idx, (wid, name, action) in enumerate(PIPELINE_STAGES):
-            build['stage']     = name
+            build['stage']     = f"Queuing: {name}"
             build['stage_idx'] = idx
-            build['progress']  = int(((idx) / len(PIPELINE_STAGES)) * 95)
-            build['logs'].append(f"[{wid}] {action}…")
-            time.sleep(0.3)   # yield to let the thread breathe
+            build['progress']  = 2 + int(((idx + 1) / len(PIPELINE_STAGES)) * 13)  # 2→15 %
+            build['logs'].append(f"  [{wid:12s}] {action}")
+            time.sleep(0.08)
 
-        # Run actual orchestrator
+        build['stage']    = 'Executing Pipeline…'
+        build['progress'] = 16
+        build['logs'].append("[NEXUS] All stages queued. Handing off to orchestrator…")
+
+        # ── Real orchestrator ──────────────────────────────────────────────
         from core.orchestrator import Orchestrator
-        build['logs'].append("[NEXUS] Pipeline executing…")
         orch    = Orchestrator()
         project = orch.run(goal)
+        elapsed = round(time.time() - start_time, 1)
 
-        # Surface generated artefacts to the UI
-        deploy_path = None
-        if isinstance(project, dict):
-            deploy_path = project.get('deployment', {}).get('deployment_path')
+        # ── Gate-halt: orchestrator returned None (old path, safety net) ──
+        if project is None:
+            build['status']   = 'error'
+            build['progress'] = 0
+            build['stage']    = '✗ Pipeline Halted'
+            build['error']    = 'A quality gate blocked the build. Review the logs above for which stage failed.'
+            build['logs'].append("[NEXUS] ✗ Pipeline halted — quality gate blocked release.")
+            build['logs'].append("[NEXUS] No download generated.")
+            return
 
+        # ── Structured error returned by a gate halt ───────────────────────
+        if isinstance(project, dict) and project.get('error'):
+            failed  = project.get('failed_stage', 'Unknown Stage')
+            reason  = project.get('reason',       'No reason provided.')
+            suggest = project.get('suggestion',   '')
+            build['status']   = 'error'
+            build['progress'] = 0
+            build['stage']    = f"✗ {failed}"
+            build['error']    = f"{failed}: {reason}"
+            build['logs'].append(f"[NEXUS] ✗ STAGE FAILED: {failed}")
+            build['logs'].append(f"[NEXUS]   Reason  : {reason}")
+            if suggest:
+                build['logs'].append(f"[NEXUS]   Fix     : {suggest}")
+            build['logs'].append("[NEXUS] ✗ No download generated. Fix the issue and rebuild.")
+            return
+
+        # ── Unexpected return type ─────────────────────────────────────────
+        if not isinstance(project, dict):
+            build['status']   = 'error'
+            build['progress'] = 0
+            build['stage']    = '✗ Internal Error'
+            build['error']    = f'Orchestrator returned unexpected type: {type(project).__name__}'
+            build['logs'].append(f"[NEXUS] ✗ Internal error — unexpected orchestrator result.")
+            return
+
+        # ── Verify deployment output exists on disk ────────────────────────
+        deploy_path = project.get('deployment', {}).get('deployment_path')
+        if not deploy_path or not Path(deploy_path).exists():
+            build['status']   = 'error'
+            build['progress'] = 0
+            build['stage']    = '✗ No Deployment Output'
+            build['error']    = 'All stages ran but no deployment folder was created on disk.'
+            build['logs'].append("[NEXUS] ✗ Deployment folder missing — build incomplete.")
+            build['logs'].append("[NEXUS] ✗ No download generated.")
+            return
+
+        # ── Verification summary (already blocked in orchestrator if failed) #
+        verification = project.get('verification', {})
+        v_score = verification.get('verification_score', '?')
+        v_checks = f"{verification.get('checks_passed','?')}/{verification.get('checks_total','?')}"
+        build['logs'].append(f"[VERIFY] Score: {v_score}%  Checks: {v_checks}")
+
+        # ── ALL gates passed — mark complete ───────────────────────────────
         build['status']      = 'complete'
         build['progress']    = 100
-        build['stage']       = 'Complete'
+        build['stage']       = '✓ Complete'
         build['deploy_path'] = deploy_path
         build['result']      = {
-            'framework'    : project.get('architecture', {}).get('framework', 'Python') if isinstance(project, dict) else 'Python',
-            'language'     : project.get('architecture', {}).get('language', 'Python')  if isinstance(project, dict) else 'Python',
+            'framework'    : project.get('architecture', {}).get('framework', 'Python'),
+            'language'     : project.get('architecture', {}).get('language',  'Python'),
             'deploy_path'  : deploy_path,
-            'has_artifacts': bool(deploy_path and Path(deploy_path).exists()),
+            'has_artifacts': True,
         }
-        if deploy_path:
-            build['logs'].append(f"[NEXUS] ✓ Pipeline complete. Project saved → {deploy_path}")
-        else:
-            build['logs'].append("[NEXUS] ✓ Pipeline complete. (Deployment path not generated)")
-
-        # ── SMS alert on completion ────────────────────────────────────────
+        build['logs'].append(f"[NEXUS] ✓ All {len(PIPELINE_STAGES)} stages passed.")
+        build['logs'].append(f"[NEXUS] ✓ Project saved → {deploy_path}")
+        build['logs'].append(f"[NEXUS] ✓ Build completed in {elapsed}s")
         _notify_build_complete(goal, deploy_path)
 
     except Exception as exc:
-        build['status'] = 'error'
-        build['error']  = str(exc)
+        elapsed = round(time.time() - start_time, 1)
+        build['status']   = 'error'
+        build['progress'] = 0
+        build['stage']    = '✗ Exception'
+        build['error']    = str(exc)
         build['logs'].append(f"[ERROR] {exc}")
+        build['logs'].append(f"[NEXUS] ✗ Pipeline crashed after {elapsed}s. No download generated.")
 
 
 # ── Publish helpers ────────────────────────────────────────────────────────────

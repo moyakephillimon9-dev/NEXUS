@@ -157,6 +157,150 @@
   {% endif %}
 </div>
 
+<!-- ══ Withdraw / Payout Section ══════════════════════════════════════════ -->
+<div class="card mb-24" id="payout-section">
+  <div class="card-title mb-4">💸 Withdraw to Your Account</div>
+  <div class="card-subtitle mb-20">Move your earnings to PayPal, your bank, or Stripe.</div>
+
+  {% set pm = revenue.get('payout_method') %}
+  {% set earned = summary.total_usd %}
+  {% set withdrawn = namespace(total=0) %}
+  {% for w in revenue.get('withdrawals', []) %}
+    {% if w.status != 'rejected' %}{% set withdrawn.total = withdrawn.total + w.amount_usd %}{% endif %}
+  {% endfor %}
+  {% set available = earned - withdrawn.total %}
+
+  <!-- Balance bar -->
+  <div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <div class="stat-card" style="flex:1;min-width:140px;border-color:rgba(0,212,255,0.25);">
+      <div class="stat-icon" style="background:rgba(0,212,255,0.1);font-size:20px;">💰</div>
+      <div>
+        <div class="stat-value" style="color:var(--cyan);">${{ '%.2f'|format(earned) }}</div>
+        <div class="stat-label">Total Earned</div>
+      </div>
+    </div>
+    <div class="stat-card" style="flex:1;min-width:140px;border-color:rgba(255,68,102,0.25);">
+      <div class="stat-icon" style="background:rgba(255,68,102,0.1);font-size:20px;">📤</div>
+      <div>
+        <div class="stat-value" style="color:#ff4466;">${{ '%.2f'|format(withdrawn.total) }}</div>
+        <div class="stat-label">Withdrawn</div>
+      </div>
+    </div>
+    <div class="stat-card" style="flex:1;min-width:140px;border-color:rgba(0,255,153,0.25);">
+      <div class="stat-icon green" style="font-size:20px;">✅</div>
+      <div>
+        <div class="stat-value" style="color:#00ff99;">${{ '%.2f'|format(available) }}</div>
+        <div class="stat-label">Available to Withdraw</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:20px;">
+
+    <!-- Payout method setup -->
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-mid);">
+        {{ '✓ Payout Method Saved' if pm else '① Set Your Payout Method' }}
+      </div>
+      {% if pm %}
+      <div style="background:rgba(0,255,153,0.06);border:1px solid rgba(0,255,153,0.2);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Active method</div>
+        <div style="font-size:14px;font-weight:600;text-transform:uppercase;color:#00ff99;">{{ pm.method }}</div>
+        <div style="font-size:13px;color:var(--text-mid);margin-top:2px;">{{ pm.detail }}</div>
+        {% if pm.name %}<div style="font-size:12px;color:var(--text-muted);">{{ pm.name }}</div>{% endif %}
+      </div>
+      {% endif %}
+      <div class="form-group mb-12">
+        <label class="form-label">Method</label>
+        <select id="pm-method" class="form-select" onchange="togglePayoutFields()">
+          <option value="paypal" {{ 'selected' if pm and pm.method=='paypal' }}>PayPal</option>
+          <option value="bank"   {{ 'selected' if pm and pm.method=='bank'   }}>Bank Transfer</option>
+          <option value="stripe" {{ 'selected' if pm and pm.method=='stripe' }}>Stripe</option>
+        </select>
+      </div>
+      <div class="form-group mb-12" id="pm-detail-group">
+        <label class="form-label" id="pm-detail-label">PayPal Email</label>
+        <input type="text" id="pm-detail" class="form-input"
+          placeholder="you@example.com"
+          value="{{ pm.detail if pm else '' }}">
+      </div>
+      <div class="form-group mb-16" id="pm-name-group" style="display:none;">
+        <label class="form-label">Account Holder Name</label>
+        <input type="text" id="pm-name" class="form-input"
+          placeholder="Your full name"
+          value="{{ pm.name if pm else '' }}">
+      </div>
+      <button onclick="savePayoutMethod()" class="btn btn-primary" style="width:100%;">
+        💾 Save Payout Method
+      </button>
+      <div id="pm-status" style="font-size:12px;margin-top:8px;text-align:center;"></div>
+    </div>
+
+    <!-- Withdraw form -->
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-mid);">② Request Withdrawal</div>
+      <div style="background:rgba(138,43,226,0.08);border:1px solid rgba(138,43,226,0.25);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--text-muted);">Available balance</div>
+        <div style="font-size:24px;font-weight:800;color:#c084fc;" id="avail-balance">${{ '%.2f'|format(available) }}</div>
+      </div>
+      <div class="form-group mb-12">
+        <label class="form-label">Amount (USD) *</label>
+        <input type="number" id="wd-amount" class="form-input" min="1" step="0.01"
+          placeholder="0.00" max="{{ '%.2f'|format(available) }}">
+      </div>
+      <div class="form-group mb-16">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="wd-note" class="form-input" placeholder="e.g. July earnings">
+      </div>
+      <button onclick="requestWithdrawal()" class="btn btn-primary" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a855f7);">
+        💸 Request Withdrawal
+      </button>
+      <div id="wd-status" style="font-size:12px;margin-top:8px;text-align:center;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Withdrawal History -->
+{% if revenue.get('withdrawals') %}
+<div class="card mb-24">
+  <div class="card-title mb-16">📋 Withdrawal History</div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border);">
+          <th style="padding:8px 12px;">Date</th>
+          <th style="padding:8px 12px;">Method</th>
+          <th style="padding:8px 12px;">To</th>
+          <th style="padding:8px 12px;">Note</th>
+          <th style="padding:8px 12px;text-align:right;">Amount</th>
+          <th style="padding:8px 12px;text-align:center;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in revenue.get('withdrawals', [])[:30] %}
+        {% set sc = {'pending':'#facc15','completed':'#00ff99','rejected':'#ff4466'} %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:10px 12px;color:var(--text-muted);">{{ w.requested_at[:10] }}</td>
+          <td style="padding:10px 12px;text-transform:uppercase;font-size:11px;">{{ w.method }}</td>
+          <td style="padding:10px 12px;color:var(--text-mid);font-size:12px;">{{ w.detail[:28] }}</td>
+          <td style="padding:10px 12px;color:var(--text-muted);">{{ w.note or '—' }}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;color:#c084fc;">${{ '%.2f'|format(w.amount_usd) }}</td>
+          <td style="padding:10px 12px;text-align:center;">
+            <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+              background:{{ sc.get(w.status,'rgba(255,255,255,0.08)') }}22;
+              color:{{ sc.get(w.status,'#aaa') }};">
+              {{ w.status|upper }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <!-- Add Revenue Modal -->
 <div id="add-revenue-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--card-bg);border:1px solid var(--cyan-border);border-radius:20px;padding:32px;max-width:440px;width:90%;">
@@ -192,6 +336,62 @@
 </div>
 
 <script>
+// ── Payout method ──────────────────────────────────────────────────────────
+
+function togglePayoutFields() {
+  const method = document.getElementById('pm-method').value;
+  const lbl    = document.getElementById('pm-detail-label');
+  const det    = document.getElementById('pm-detail');
+  const nameGrp= document.getElementById('pm-name-group');
+  if (method === 'paypal') {
+    lbl.textContent = 'PayPal Email'; det.placeholder = 'you@paypal.com'; nameGrp.style.display = 'none';
+  } else if (method === 'bank') {
+    lbl.textContent = 'Account Number'; det.placeholder = '0000000000'; nameGrp.style.display = '';
+  } else {
+    lbl.textContent = 'Stripe Account ID'; det.placeholder = 'acct_...'; nameGrp.style.display = 'none';
+  }
+}
+
+async function savePayoutMethod() {
+  const method = document.getElementById('pm-method').value;
+  const detail = document.getElementById('pm-detail').value.trim();
+  const name   = (document.getElementById('pm-name').value || '').trim();
+  const st     = document.getElementById('pm-status');
+  if (!detail) { st.textContent = '⚠ Enter your account detail.'; st.style.color='#ff4466'; return; }
+  const res  = await fetch('/api/revenue/payout-method', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ method, detail, name }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    st.textContent = '✓ Payout method saved!'; st.style.color = '#00ff99';
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    st.textContent = '⚠ ' + data.error; st.style.color = '#ff4466';
+  }
+}
+
+async function requestWithdrawal() {
+  const amount = parseFloat(document.getElementById('wd-amount').value);
+  const note   = document.getElementById('wd-note').value.trim();
+  const st     = document.getElementById('wd-status');
+  if (!amount || amount <= 0) { st.textContent = '⚠ Enter a valid amount.'; st.style.color='#ff4466'; return; }
+  const res  = await fetch('/api/revenue/withdraw', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ amount, note }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    st.textContent = `✓ $${amount.toFixed(2)} withdrawal requested! Remaining: $${data.available.toFixed(2)}`;
+    st.style.color = '#00ff99';
+    setTimeout(() => location.reload(), 1800);
+  } else {
+    st.textContent = '⚠ ' + data.error; st.style.color = '#ff4466';
+  }
+}
+
+// ── Revenue logging ────────────────────────────────────────────────────────
+
 async function logRevenue() {
   const amount = parseFloat(document.getElementById('rev-amount').value);
   const source = document.getElementById('rev-source').value;

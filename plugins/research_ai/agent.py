@@ -330,19 +330,29 @@ class ResearchAI:
 
     def _save(self):
         """Atomic save of the knowledge base."""
+        # Always ensure directories exist — CWD may differ from boot path
+        self.kb_path.parent.mkdir(parents=True, exist_ok=True)
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+
         tmp = self.kb_path.with_suffix(".tmp")
         self._kb["manifest"]["last_updated"] = (
             datetime.now(timezone.utc).isoformat()
         )
-        with open(tmp, "w") as f:
-            json.dump(self._kb, f, indent=4)
-        # Backup existing
-        if self.kb_path.exists():
-            ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
-            bak = self.backup_dir / f"kb_{ts}.bak"
-            import shutil
-            shutil.copy2(self.kb_path, bak)
-        os.replace(tmp, self.kb_path)
+        try:
+            with open(tmp, "w") as f:
+                json.dump(self._kb, f, indent=4)
+            # Backup existing before replacing
+            if self.kb_path.exists():
+                import shutil
+                ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
+                bak = self.backup_dir / f"kb_{ts}.bak"
+                shutil.copy2(self.kb_path, bak)
+            os.replace(tmp, self.kb_path)
+        except Exception as exc:
+            # Never corrupt existing KB on failure
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
+            print(f"[Research AI] ⚠ Knowledge base save failed: {exc}")
 
     # ---------------------------------------------------------------- #
     # Research Engine                                                    #

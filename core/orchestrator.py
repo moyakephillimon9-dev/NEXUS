@@ -182,7 +182,12 @@ class Orchestrator:
         if not approved:
             print("\n[PIPELINE] Execution blocked by Manager AI.")
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Manager AI — Strategic Gate',
+                'reason'       : 'Manager AI rejected this goal. The project plan could not be formulated.',
+                'suggestion'   : 'Simplify the goal, break it into smaller steps, or check your AI provider configuration.',
+            }
 
         print(f"\n[PIPELINE] Strategic Gate Approved : {task_id}")
 
@@ -322,7 +327,12 @@ class Orchestrator:
         if not code:
             print("\n[PIPELINE ERROR] Coder AI failed to generate source code.")
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Coder AI — Source Code Generation',
+                'reason'       : 'Coder AI did not produce any source code for this project.',
+                'suggestion'   : 'Check AI provider settings, or try a simpler / more specific goal description.',
+            }
 
         print(f"\nCode Summary")
         print("-" * 40)
@@ -361,8 +371,14 @@ class Orchestrator:
 
         if not review["approved"]:
             print("\n[PIPELINE HALTED] Reviewer AI rejected this release.")
+            issues_str = '; '.join(review.get('issues', [])[:3])
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Reviewer AI — Static Code Review',
+                'reason'       : f"Quality score {review.get('quality_score', '?')}/100 — {review.get('release_recommendation', 'Release blocked.')} Issues: {issues_str}",
+                'suggestion'   : 'Refine the goal to produce higher-quality code, or check reviewer thresholds in settings.',
+            }
 
         # ── STAGE 10 : Tester AI ──────────────────────────────────── #
 
@@ -381,7 +397,12 @@ class Orchestrator:
         if not tests["passed"]:
             print("\n[PIPELINE HALTED] Runtime validation failed.")
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Tester AI — Runtime Validation',
+                'reason'       : f"Tests failed. Coverage: {tests.get('coverage', '?')}%. Recommendation: {tests.get('release_recommendation', 'Fix failing tests.')}",
+                'suggestion'   : 'Review test output above, fix the failing logic in the generated code, and re-run the build.',
+            }
 
         # ── STAGE 11 : Security AI ────────────────────────────────── #
 
@@ -404,8 +425,15 @@ class Orchestrator:
 
         if not security.get("approved", False):
             print("\n[PIPELINE HALTED] Security AI blocked this release.")
+            critical = [f for f in security.get('findings', []) if f.get('severity') in ('CRITICAL', 'HIGH')]
+            reason_detail = f"{len(critical)} critical/high finding(s)." if critical else "Security score too low."
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Security AI — Vulnerability Scan',
+                'reason'       : f"Security score {security.get('security_score', '?')}/100. {reason_detail}",
+                'suggestion'   : 'Review the security findings listed above. Avoid eval(), shell injection, hardcoded secrets, and unsafe imports.',
+            }
 
         # ── STAGE 12 : Performance AI ─────────────────────────────── #
 
@@ -487,7 +515,12 @@ class Orchestrator:
         if deployment is None:
             print("\n[DEPLOYMENT FAILED] Deployment metadata not generated.")
             self.manager.show_projects()
-            return
+            return {
+                'error'        : True,
+                'failed_stage' : 'Deployment AI — Enterprise Deployment',
+                'reason'       : 'Deployment AI did not generate a deployment folder or metadata.',
+                'suggestion'   : 'Ensure the deployments/ directory is writable and the Deployment AI plugin is installed correctly.',
+            }
 
         print("\nDeployment Verification")
         print("-" * 40)
@@ -520,9 +553,14 @@ class Orchestrator:
             if issues:
                 print("\nVerification Issues:")
                 for issue in issues:
-                    print(f"  ⚠  {issue}")
-            # Non-blocking — report but continue
-            print("\n[PIPELINE] Verification issues noted — continuing to progress report.")
+                    print(f"  ✗  {issue}")
+            print("\n[PIPELINE HALTED] Verification failed — download blocked.")
+            return {
+                'error'        : True,
+                'failed_stage' : 'Verification AI — Final Verification',
+                'reason'       : f"Verification score {verification.get('verification_score', '?')}%. {len(issues)} issue(s): {'; '.join(issues[:3])}",
+                'suggestion'   : 'Check the verification issues above. Ensure code, tests, docs, and deployment files are all present.',
+            }
 
         # ── STAGE 19 : Progress Tracker ───────────────────────────── #
 
