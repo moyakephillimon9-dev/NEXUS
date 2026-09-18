@@ -2,20 +2,257 @@
     "manifest": {
         "engine": "NEXUS RESEARCH ENGINE",
         "version": "1.0.0",
-        "created": "2026-08-01T11:57:24.907704+00:00",
-        "last_updated": "2026-08-01T11:57:25.103910+00:00"
+        "created": "2026-08-02T14:06:27.511141+00:00",
+        "last_updated": "2026-08-02T14:28:05.893425+00:00"
     },
     "topics": {
-        "8bed9f38f2575ee8": {
-            "researched_at": "2026-08-01T11:57:25.103124+00:00",
-            "goal": "[Dashboard] I want you to create a dashboard for yourself",
+        "0a4f792cff500226": {
+            "researched_at": "2026-08-02T14:06:27.621925+00:00",
+            "goal": "[Web Application] Build a modern personal finance mobile application called MoneyFlow.\n\nRequirements:\n\n- Secure Founder login\n- User registration\n- Dashboard\n- Income tracking\n- Expense tracking\n- Budget planner\n- Savings goals\n- Transaction history\n- Charts and analytics\n- Dark mode UI\n- Settings page\n- SQLite database\n- Responsive design\n- Offline support\n- Export reports to PDF and CSV\n- Unit tests\n- Documentation\n- Production-ready project structure\n\nThe project must compile successfully, pass all tests, pass security verification, and only generate the downloadable ZIP after every pipeline stage completes successfully.",
+            "project_type": "data_analyzer",
+            "verified": true,
+            "concepts": [
+                "web",
+                "application",
+                "modern",
+                "personal",
+                "finance",
+                "mobile",
+                "called",
+                "moneyflow",
+                "requirements",
+                "secure",
+                "founder",
+                "login",
+                "user",
+                "registration",
+                "dashboard",
+                "income",
+                "tracking",
+                "expense",
+                "budget",
+                "planner",
+                "savings",
+                "goals",
+                "transaction",
+                "history",
+                "charts",
+                "analytics",
+                "dark",
+                "mode",
+                "settings",
+                "page",
+                "sqlite",
+                "database",
+                "responsive",
+                "design",
+                "offline",
+                "support",
+                "export",
+                "reports",
+                "pdf",
+                "csv",
+                "unit",
+                "tests",
+                "documentation",
+                "production",
+                "ready",
+                "project",
+                "structure",
+                "must",
+                "compile",
+                "successfully",
+                "pass",
+                "all",
+                "security",
+                "verification",
+                "only",
+                "generate",
+                "downloadable",
+                "zip",
+                "after",
+                "every",
+                "pipeline",
+                "stage",
+                "completes"
+            ],
+            "sources": [
+                {
+                    "source": "Internal Engineering Pattern Library",
+                    "project_type": "data_analyzer",
+                    "paradigm": "Pipeline",
+                    "patterns": [
+                        "ETL",
+                        "Strategy Pattern",
+                        "Builder"
+                    ],
+                    "stack": {
+                        "language": "Python",
+                        "deps": [
+                            "pandas",
+                            "matplotlib"
+                        ]
+                    },
+                    "complexity": "MEDIUM",
+                    "estimated_hours": 5,
+                    "risks": [
+                        "Memory overflow on large files",
+                        "Encoding issues"
+                    ],
+                    "best_practices": [
+                        "Validate data types on load.",
+                        "Handle missing values explicitly.",
+                        "Log statistics before and after transformations."
+                    ]
+                },
+                {
+                    "source": "Memory AI Historical Database",
+                    "past_successes": 15,
+                    "past_failures": 0,
+                    "success_lessons": [
+                        "Build a calculator application",
+                        "Build a calculator application",
+                        "Build a todo app"
+                    ],
+                    "failure_lessons": [],
+                    "historical_frameworks": [
+                        "FastAPI",
+                        "Python stdlib",
+                        "Python stdlib (csv, statistics)",
+                        "Flask"
+                    ]
+                },
+                {
+                    "source": "Goal Semantic Analysis",
+                    "concepts": [
+                        "web",
+                        "application",
+                        "modern",
+                        "personal",
+                        "finance",
+                        "mobile",
+                        "called",
+                        "moneyflow",
+                        "requirements",
+                        "secure",
+                        "founder",
+                        "login",
+                        "user",
+                        "registration",
+                        "dashboard",
+                        "income",
+                        "tracking",
+                        "expense",
+                        "budget",
+                        "planner",
+                        "savings",
+                        "goals",
+                        "transaction",
+                        "history",
+                        "charts",
+                        "analytics",
+                        "dark",
+                        "mode",
+                        "settings",
+                        "page",
+                        "sqlite",
+                        "database",
+                        "responsive",
+                        "design",
+                        "offline",
+                        "support",
+                        "export",
+                        "reports",
+                        "pdf",
+                        "csv",
+                        "unit",
+                        "tests",
+                        "documentation",
+                        "production",
+                        "ready",
+                        "project",
+                        "structure",
+                        "must",
+                        "compile",
+                        "successfully",
+                        "pass",
+                        "all",
+                        "security",
+                        "verification",
+                        "only",
+                        "generate",
+                        "downloadable",
+                        "zip",
+                        "after",
+                        "every",
+                        "pipeline",
+                        "stage",
+                        "completes"
+                    ],
+                    "goal_length_words": 95,
+                    "domain_keywords": [
+                        "application",
+                        "dashboard",
+                        "planner",
+                        "analytics",
+                        "csv",
+                        "pipeline"
+                    ]
+                }
+            ],
+            "recommended_stack": {
+                "language": "Python",
+                "deps": [
+                    "pandas",
+                    "matplotlib"
+                ]
+            },
+            "recommended_patterns": [
+                "ETL",
+                "Strategy Pattern",
+                "Builder"
+            ],
+            "complexity": "MEDIUM",
+            "estimated_hours": 5,
+            "risks": [
+                "Memory overflow on large files",
+                "Encoding issues"
+            ],
+            "best_practices": [
+                "Validate data types on load.",
+                "Handle missing values explicitly.",
+                "Log statistics before and after transformations."
+            ]
+        },
+        "7b066334c82318d2": {
+            "researched_at": "2026-08-02T14:28:05.890783+00:00",
+            "goal": "[Web Application] I mean I tried to create but there was an error so I like you to ask  my working to fix them selves and record error upgrade themselves I want to see Nexus in next level",
             "project_type": "web_app",
             "verified": true,
             "concepts": [
-                "dashboard",
-                "want",
+                "web",
+                "application",
+                "mean",
+                "tried",
+                "but",
+                "there",
+                "was",
+                "error",
+                "like",
                 "you",
-                "yourself"
+                "ask",
+                "working",
+                "fix",
+                "them",
+                "selves",
+                "record",
+                "upgrade",
+                "themselves",
+                "want",
+                "see",
+                "nexus",
+                "next",
+                "level"
             ],
             "sources": [
                 {
@@ -60,23 +297,43 @@
                     ],
                     "failure_lessons": [],
                     "historical_frameworks": [
-                        "Python stdlib",
                         "FastAPI",
-                        "Flask",
-                        "Python stdlib (csv, statistics)"
+                        "Python stdlib",
+                        "Python stdlib (csv, statistics)",
+                        "Flask"
                     ]
                 },
                 {
                     "source": "Goal Semantic Analysis",
                     "concepts": [
-                        "dashboard",
-                        "want",
+                        "web",
+                        "application",
+                        "mean",
+                        "tried",
+                        "but",
+                        "there",
+                        "was",
+                        "error",
+                        "like",
                         "you",
-                        "yourself"
+                        "ask",
+                        "working",
+                        "fix",
+                        "them",
+                        "selves",
+                        "record",
+                        "upgrade",
+                        "themselves",
+                        "want",
+                        "see",
+                        "nexus",
+                        "next",
+                        "level"
                     ],
-                    "goal_length_words": 10,
+                    "goal_length_words": 38,
                     "domain_keywords": [
-                        "dashboard"
+                        "web",
+                        "application"
                     ]
                 }
             ],
@@ -96,19 +353,6 @@
             "estimated_hours": 8,
             "risks": [
                 "XSS",
-                "CSRF",
-                "SQL injection",
-                "Session hijacking"
-            ],
-            "best_practices": [
-                "Sanitise all user inputs.",
-                "Use HTTPS in production.",
-                "Implement CSRF protection.",
-                "Follow the principle of least privilege."
-            ]
-        }
-    }
-}              "XSS",
                 "CSRF",
                 "SQL injection",
                 "Session hijacking"

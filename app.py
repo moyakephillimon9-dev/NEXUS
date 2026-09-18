@@ -1,505 +1,81 @@
-"""
-NEXUS — AI Operating System
-Web Application Entry Point
-
-Version : 0.1.0
-Owner   : Moyake Phillimon
-"""
-
-import os, json, threading, time, datetime, zipfile, io
-from pathlib import Path
-from functools import wraps
-
-from flask import (Flask, render_template, request, session,
-                   redirect, url_for, jsonify, Response, send_file)
-
-from core.auth import Auth
-from core.owner_manager import OwnerManager
-from core.nexus_brain import NexusBrain
-from core.config import Config
-from core import sms_otp
-
-# ── App bootstrap ──────────────────────────────────────────────────────────────
-app = Flask(__name__)
-app.secret_key = os.environ.get('SESSION_SECRET', 'nexus-internal-key-change-me')
-
-auth     = Auth()
-owner_mgr = OwnerManager()
-brain    = NexusBrain()
-
-# task_id → progress dict (in-memory; survives the request lifecycle)
-active_builds: dict = {}
-
-
-# ── Auth decorator ─────────────────────────────────────────────────────────────
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('owner_id'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# AUTH ROUTES
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/')
-def index():
-    if not owner_mgr.has_owner():
-        return redirect(url_for('setup'))
-    if not session.get('owner_id'):
-        return redirect(url_for('login'))
-    return redirect(url_for('dashboard'))
+        },
+        {
+            "title": "💬 How to Engage Without Being Spammy",
+            "points": [
+                "Spend 15 minutes daily commenting genuinely on posts in your target groups",
+                "Answer questions with real value — prove your expertise BEFORE pitching",
+                "Post one helpful tip or insight per group per week (no selling, just value)",
+                "Like and respond to everyone who comments on your posts",
+                "Wait until someone asks about your area before mentioning your product",
+            ]
+        },
+        {
+            "title": "📩 Direct Message Strategy",
+            "points": [
+                "Only DM people who have engaged with your content or asked relevant questions",
+                "Start with a genuine compliment or reference to something they posted",
+                "Ask ONE question about their problem — don't pitch in the first message",
+                "Follow up once after 48 hours if no response — then move on",
+                f"Message template: 'Hi [Name], saw your post about [topic] — we actually help {target} with exactly that at {company}. Mind if I share how?'",
+            ]
+        },
+        {
+            "title": "📣 Paid Facebook Ads Strategy ($5-10/day)",
+            "points": [
+                f"Target: {target} → Interests: [specific interest 1], [specific interest 2]",
+                "Location: Start with your city/region before going national",
+                "Age: Research your core audience age bracket",
+                "Ad objective: 'Lead Generation' or 'Messages' (not just Reach)",
+                "Test 2-3 ad creatives with different hooks — kill the losers after 3 days",
+            ]
+        },
+        {
+            "title": "🎯 The Lead Magnet Approach (Most Effective)",
+            "points": [
+                f"Create a FREE resource: 'The Ultimate Guide to [problem your {target} has]'",
+                "Offer it in exchange for their WhatsApp number or email",
+                "Follow up within 1 hour of them downloading it",
+                "This builds trust before you ever mention your product",
+                "Tools: Google Forms or Typeform for capture, WhatsApp Business for follow-up",
+            ]
+        },
+    ]
+    return jsonify({'sections': sections})
 
 
-@app.route('/setup', methods=['GET', 'POST'])
-def setup():
-    if owner_mgr.has_owner():
-        return redirect(url_for('login'))
-    error = None
-    if request.method == 'POST':
-        d = request.form
-        pw  = d.get('password', '')
-        pw2 = d.get('password2', '')
-        if pw != pw2:
-            error = 'Passwords do not match.'
-        elif len(pw) < 8:
-            error = 'Password must be at least 8 characters.'
-        else:
-            result = owner_mgr.create_owner(
-                full_name = d.get('full_name', '').strip(),
-                email     = d.get('email', '').strip().lower(),
-                phone     = d.get('phone', '').strip(),
-                company   = d.get('company', '').strip(),
-                country   = d.get('country', '').strip(),
-                timezone  = d.get('timezone', 'UTC'),
-                password  = pw,
-            )
-            if result['success']:
-                session['owner_id']   = result['owner_id']
-                session['owner_name'] = result['name']
-                return redirect(url_for('dashboard'))
-            error = result.get('error', 'Setup failed.')
-    return render_template('setup.html', error=error)
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if not owner_mgr.has_owner():
-        return redirect(url_for('setup'))
-    if session.get('owner_id'):
-        return redirect(url_for('dashboard'))
-    error = None
-    if request.method == 'POST':
-        result = auth.verify(
-            request.form.get('email', '').strip().lower(),
-            request.form.get('password', ''),
-        )
-        if result['success']:
-            session['owner_id']   = result['owner_id']
-            session['owner_name'] = result['name']
-            return redirect(url_for('dashboard'))
-        error = 'Invalid email or password.'
-    return render_template('login.html', error=error)
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SMS / PHONE VERIFICATION
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/phone/send-otp', methods=['POST'])
-def api_phone_send_otp():
-    """Send a 6-digit OTP to the given phone number (no auth required — used at setup)."""
-    phone = (request.json or {}).get('phone', '').strip()
-    if not phone:
-        return jsonify({'success': False, 'error': 'Phone number is required.'}), 400
-    result = sms_otp.send_otp(phone)
-    return jsonify(result)
-
-
-@app.route('/api/phone/verify-otp', methods=['POST'])
-def api_phone_verify_otp():
-    """Verify an OTP code against a phone number (no auth required — used at setup)."""
-    data  = request.json or {}
-    phone = data.get('phone', '').strip()
-    code  = data.get('code', '').strip()
-    if not phone or not code:
-        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
-    result = sms_otp.verify_otp(phone, code)
-    if result['success']:
-        # Store verified phone in session so setup form can confirm it
-        session['phone_verified'] = phone
-    return jsonify(result)
-
-
-@app.route('/api/phone/send-otp-auth', methods=['POST'])
+@app.route('/api/social/outreach', methods=['POST'])
 @login_required
-def api_phone_send_otp_auth():
-    """Send OTP to an authenticated owner's phone (from Settings)."""
-    phone = (request.json or {}).get('phone', '').strip()
-    if not phone:
-        owner = owner_mgr.get_owner()
-        phone = owner.get('phone', '')
-    if not phone:
-        return jsonify({'success': False, 'error': 'No phone number on file.'}), 400
-    result = sms_otp.send_otp(phone)
-    return jsonify(result)
-
-
-@app.route('/api/phone/verify-otp-auth', methods=['POST'])
-@login_required
-def api_phone_verify_otp_auth():
-    """Verify OTP and mark phone as verified on the owner profile."""
-    data  = request.json or {}
-    phone = data.get('phone', '').strip()
-    code  = data.get('code', '').strip()
-    if not phone or not code:
-        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
-    result = sms_otp.verify_otp(phone, code)
-    if result['success']:
-        owner_mgr.update_owner({'phone': phone, 'phone_verified': True})
-    return jsonify(result)
-
-
-@app.route('/api/twilio/status')
-def api_twilio_status():
-    return jsonify({'configured': sms_otp.is_configured()})
-
-
-@app.route('/api/sms/test', methods=['POST'])
-@login_required
-def api_sms_test():
-    """Send a test SMS to the owner's registered phone."""
-    owner = owner_mgr.get_owner()
-    phone = owner.get('phone', '').strip()
-    if not phone:
-        return jsonify({'success': False, 'error': 'No phone number on your profile. Add one in Settings first.'}), 400
-    if not sms_otp.is_configured():
-        return jsonify({'success': False, 'error': 'Twilio secrets not set. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in Replit Secrets.'}), 400
-    result = _send_alert_sms(phone, f"✅ NEXUS SMS Test — your alerts are working! System is online.")
-    return jsonify(result)
-
-
-@app.route('/api/sms/alert', methods=['POST'])
-@login_required
-def api_sms_alert():
-    """Send a manual SMS alert with a custom message."""
+def api_social_outreach():
     data    = request.json or {}
-    message = data.get('message', '').strip()
-    if not message:
-        return jsonify({'success': False, 'error': 'Message is required.'}), 400
-    owner = owner_mgr.get_owner()
-    phone = owner.get('phone', '').strip()
-    if not phone:
-        return jsonify({'success': False, 'error': 'No phone number on your profile.'}), 400
-    result = _send_alert_sms(phone, message)
-    return jsonify(result)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN DASHBOARD
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    owner    = owner_mgr.get_owner()
-    projects = _load_projects()[:6]
-    workers  = brain.get_workers_summary()
-    stats    = {
-        'total_projects' : len(_load_projects()),
-        'workers_online' : len([w for w in workers if w.get('status') == 'online']),
-        'memory_entries' : _count_memory_entries(),
-        'active_builds'  : len([b for b in active_builds.values() if b.get('status') == 'running']),
-    }
-    return render_template('dashboard.html', owner=owner, projects=projects,
-                           workers=workers, stats=stats)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CHAT
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/chat')
-@login_required
-def chat():
-    owner   = owner_mgr.get_owner()
-    history = brain.get_chat_history()
-    return render_template('chat.html', owner=owner, history=history)
-
-
-@app.route('/api/chat', methods=['POST'])
-@login_required
-def api_chat():
-    msg   = (request.json or {}).get('message', '').strip()
-    if not msg:
-        return jsonify({'error': 'Empty message'}), 400
-    owner = owner_mgr.get_owner()
-    brain.save_message('user', msg)
-    response = brain.respond(msg, owner)
-    brain.save_message('nexus', response)
-    return jsonify({'response': response})
-
-
-@app.route('/api/chat/stream')
-@login_required
-def api_chat_stream():
-    msg   = request.args.get('message', '').strip()
-    owner = owner_mgr.get_owner()
-
-    def generate():
-        brain.save_message('user', msg)
-        full   = ''
-        intent = brain.detect_intent(msg, owner)
-        for token in brain.stream_response(msg, owner):
-            full += token
-            yield f"data: {json.dumps({'token': token})}\n\n"
-        brain.save_message('nexus', full)
-        yield f"data: {json.dumps({'done': True, 'intent': intent})}\n\n"
-
-    return Response(generate(), mimetype='text/event-stream',
-                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
-
-
-@app.route('/api/chat/clear', methods=['POST'])
-@login_required
-def api_chat_clear():
-    brain.clear_chat_history()
-    return jsonify({'success': True})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PROJECTS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/projects')
-@login_required
-def projects():
-    owner    = owner_mgr.get_owner()
-    all_proj = _load_projects()
-    return render_template('projects.html', owner=owner, projects=all_proj)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BUILDER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/builder')
-@login_required
-def builder():
-    owner = owner_mgr.get_owner()
-    return render_template('builder.html', owner=owner)
-
-
-@app.route('/api/build', methods=['POST'])
-@login_required
-def api_build():
-    data = request.json or {}
-    goal = data.get('goal', '').strip()
-    if not goal:
-        return jsonify({'error': 'Goal is required'}), 400
-
-    task_id = f"task_{int(time.time() * 1000)}"
-    active_builds[task_id] = {
-        'goal'      : goal,
-        'status'    : 'starting',
-        'progress'  : 0,
-        'stage'     : 'Initializing',
-        'stage_idx' : 0,
-        'logs'      : [f'[NEXUS] Received goal: {goal}'],
-        'started_at': datetime.datetime.now().isoformat(),
-        'result'    : None,
-    }
-
-    thread = threading.Thread(target=_run_pipeline, args=(task_id, goal), daemon=True)
-    thread.start()
-    return jsonify({'task_id': task_id})
-
-
-@app.route('/api/build/<task_id>/status')
-@login_required
-def api_build_status(task_id):
-    build = active_builds.get(task_id)
-    if not build:
-        return jsonify({'status': 'not_found'}), 404
-    return jsonify(build)
-
-
-@app.route('/api/build/<task_id>/files')
-@login_required
-def api_build_files(task_id):
-    """List files generated in the deployment folder for a completed build."""
-    build = active_builds.get(task_id)
-    if not build:
-        return jsonify({'error': 'Build not found'}), 404
-    deploy_path = build.get('deploy_path')
-    if not deploy_path or not Path(deploy_path).exists():
-        return jsonify({'files': [], 'deploy_path': deploy_path})
-
-    files = []
-    base = Path(deploy_path)
-    for fp in sorted(base.rglob('*')):
-        if fp.is_file():
-            rel = str(fp.relative_to(base))
-            size = fp.stat().st_size
-            files.append({'name': rel, 'size': size})
-    return jsonify({'files': files, 'deploy_path': str(base)})
-
-
-@app.route('/api/build/<task_id>/download')
-@login_required
-def api_build_download(task_id):
-    """Zip and serve the generated project as a downloadable archive."""
-    build = active_builds.get(task_id)
-    if not build:
-        return jsonify({'error': 'Build not found'}), 404
-    deploy_path = build.get('deploy_path')
-    if not deploy_path or not Path(deploy_path).exists():
-        return jsonify({'error': 'No deployment artefacts found — pipeline may have not completed.'}), 404
-
-    mem_zip = io.BytesIO()
-    base    = Path(deploy_path)
-    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fp in sorted(base.rglob('*')):
-            if fp.is_file():
-                zf.write(fp, fp.relative_to(base))
-    mem_zip.seek(0)
-
-    project_name = base.name.replace(' ', '_')
-    return send_file(
-        mem_zip,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name=f"{project_name}.zip",
+    name    = data.get('name', 'there')
+    offer   = data.get('offer', 'our solution')
+    company = data.get('company', 'NEXUS')
+    message = (
+        f"Hi {name}! 👋\n\n"
+        f"I came across your profile/post and I couldn't help but think you'd benefit from what we're doing at {company}.\n\n"
+        f"We help people like you to {offer} — without the usual headaches.\n\n"
+        f"I'd love to show you exactly how it works in a quick 5-minute call or demo. "
+        f"No sales pitch, no pressure — just a genuine look at whether it fits your situation.\n\n"
+        f"Would that be okay? What's the best time to connect this week? 🙏"
     )
+    return jsonify({'message': message})
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PUBLISH — App Store Publishing (founder-approval gated)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route('/publish')
+@app.route('/api/social/schedule', methods=['POST'])
 @login_required
-def publish():
-    owner    = owner_mgr.get_owner()
-    projects = _load_projects()
-    requests = _load_publish_requests()
-    return render_template('publish.html', owner=owner, projects=projects,
-                           pub_requests=requests)
+def api_social_schedule():
+    company = (request.json or {}).get('company', 'NEXUS')
+    days = [
+        {"day": "Monday — Motivation",        "suggestion": f"Post an inspiring quote or success story related to your industry. Show the 'why' behind {company}."},
+        {"day": "Tuesday — Education",         "suggestion": "Share a helpful tip, tutorial, or 'did you know' fact your target audience will find valuable."},
+        {"day": "Wednesday — Social Proof",    "suggestion": "Post a client testimonial, case study, or before/after result. Let your customers sell for you."},
+        {"day": "Thursday — Behind the Scenes","suggestion": f"Show how {company} works — your team, your process, a feature being built, or your workspace."},
+        {"day": "Friday — Promotion + CTA",    "suggestion": "Post your best offer with a clear call to action. This is your 'selling day' after building trust all week."},
+        {"day": "Saturday — Community",        "suggestion": "Ask a question, run a poll, or post something fun and engaging. Build connection over the weekend."},
+        {"day": "Sunday — Preview",            "suggestion": "Tease what's coming next week — builds anticipation and keeps followers engaged and checking back."},
+    ]
+    return jsonify({'days': days})
 
-
-@app.route('/api/publish/request', methods=['POST'])
-@login_required
-def api_publish_request():
-    """Create a pending publish request — must be approved by founder before executing."""
-    data    = request.json or {}
-    goal    = data.get('goal', '').strip()
-    store   = data.get('store', '').strip()        # playstore | appstore | web
-    task_id = data.get('task_id', '').strip()
-    if not goal or not store:
-        return jsonify({'success': False, 'error': 'goal and store are required'}), 400
-
-    req_id  = f"pub_{int(time.time() * 1000)}"
-    pub_req = {
-        'id'          : req_id,
-        'task_id'     : task_id,
-        'goal'        : goal,
-        'store'       : store,
-        'status'      : 'pending',
-        'created_at'  : datetime.datetime.now().isoformat(),
-        'approved_at' : None,
-        'package_path': None,
-    }
-    requests = _load_publish_requests()
-    requests.append(pub_req)
-    _save_publish_requests(requests)
-
-    # SMS alert to founder
-    owner = owner_mgr.get_owner()
-    phone = owner.get('phone', '')
-    if phone:
-        _send_alert_sms(phone,
-            f"⚠️ NEXUS Publish Request\nNEXUS wants to publish '{goal[:60]}' to {store}.\n"
-            f"Log in → App Store Publish to approve or reject."
-        )
-    return jsonify({'success': True, 'request_id': req_id})
-
-
-@app.route('/api/publish/approve/<req_id>', methods=['POST'])
-@login_required
-def api_publish_approve(req_id):
-    """Founder approves a publish request → NEXUS generates the store package."""
-    requests = _load_publish_requests()
-    req = next((r for r in requests if r['id'] == req_id), None)
-    if not req:
-        return jsonify({'success': False, 'error': 'Request not found'}), 404
-    if req['status'] != 'pending':
-        return jsonify({'success': False, 'error': f"Already {req['status']}"}), 400
-
-    req['status']      = 'approved'
-    req['approved_at'] = datetime.datetime.now().isoformat()
-
-    # Generate store package
-    package_path = _generate_store_package(req)
-    req['package_path'] = package_path
-    req['status']       = 'packaged'
-    _save_publish_requests(requests)
-
-    owner = owner_mgr.get_owner()
-    phone = owner.get('phone', '')
-    if phone:
-        _send_alert_sms(phone,
-            f"✅ NEXUS Published\n'{req['goal'][:60]}' store package ready → {package_path}"
-        )
-    return jsonify({'success': True, 'package_path': package_path})
-
-
-@app.route('/api/publish/reject/<req_id>', methods=['POST'])
-@login_required
-def api_publish_reject(req_id):
-    """Founder rejects a publish request."""
-    requests = _load_publish_requests()
-    req = next((r for r in requests if r['id'] == req_id), None)
-    if not req:
-        return jsonify({'success': False, 'error': 'Request not found'}), 404
-    req['status']      = 'rejected'
-    req['rejected_at'] = datetime.datetime.now().isoformat()
-    _save_publish_requests(requests)
-    return jsonify({'success': True})
-
-
-@app.route('/api/publish/<req_id>/download')
-@login_required
-def api_publish_download(req_id):
-    """Zip and serve a store package."""
-    requests = _load_publish_requests()
-    req      = next((r for r in requests if r['id'] == req_id), None)
-    if not req or not req.get('package_path'):
-        return jsonify({'error': 'Package not found'}), 404
-    base = Path(req['package_path'])
-    if not base.exists():
-        return jsonify({'error': 'Package folder missing'}), 404
-    mem_zip = io.BytesIO()
-    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fp in sorted(base.rglob('*')):
-            if fp.is_file():
-                zf.write(fp, fp.relative_to(base))
-    mem_zip.seek(0)
-    return send_file(mem_zip, mimetype='application/zip', as_attachment=True,
-                     download_name=f"{base.name}.zip")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PROMOTE — Social Media & Google Ads
-# ═══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/promote')
 @login_required

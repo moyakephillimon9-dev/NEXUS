@@ -49,6 +49,12 @@
 
       <div class="nav-section-label">Publish & Earn</div>
 
+      <a href="{{ url_for('profit') }}" class="nav-item{% if request.endpoint == 'profit' %} active{% endif %}" style="{% if request.endpoint == 'profit' %}{% else %}{% endif %}">
+        <span class="nav-icon">💎</span> Profit Finder
+      </a>
+      <a href="{{ url_for('social') }}" class="nav-item{% if request.endpoint == 'social' %} active{% endif %}">
+        <span class="nav-icon">📱</span> Social Media
+      </a>
       <a href="{{ url_for('publish') }}" class="nav-item{% if request.endpoint == 'publish' %} active{% endif %}">
         <span class="nav-icon">🚀</span> App Store Publish
       </a>

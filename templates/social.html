@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+{% block title %}Social Media{% endblock %}
+{% block page_title %}Social Media Manager{% endblock %}
+
+{% block content %}
+<div class="section-header mb-24">
+  <div>
+    <div class="section-title">Social Media Manager</div>
+    <div class="section-sub">Create posts, find clients, and manage your Facebook presence</div>
+  </div>
+  <div id="fb-status-badge" class="badge" style="padding:8px 16px;font-size:13px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);">
+    Not Connected
+  </div>
+</div>
+
+<!-- Connect Facebook -->
+<div class="card mb-20" id="fb-connect-card" style="background:linear-gradient(135deg,rgba(24,119,242,0.06),rgba(138,43,226,0.03));border-color:rgba(24,119,242,0.25);">
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#1877f2,#0a5fd8);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0;">f</div>
+    <div>
+      <div class="card-title" style="margin:0;">Connect Facebook Page</div>
+      <div class="card-subtitle" style="margin:0;">Paste your Page Access Token to start posting and finding clients</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <input type="password" id="fb-token" class="form-input" placeholder="Paste your Facebook Page Access Token…" style="flex:1;min-width:240px;">
+    <input type="text" id="fb-page-id" class="form-input" placeholder="Page ID (optional)" style="width:180px;">
+    <button class="btn btn-primary" onclick="FB_Mgr.connect()" style="height:44px;padding:0 24px;">Connect</button>
+  </div>
+  <div class="alert alert-info mt-12" style="font-size:12px;">
+    <span>ℹ</span>
+    <div>Get your <strong>Page Access Token</strong> from: Meta for Developers → Your App → Tools → Graph API Explorer → select your Page → Generate Token. Save it as <strong>FB_PAGE_TOKEN</strong> in Replit Secrets for permanent storage.</div>
+  </div>
+  <div id="fb-connect-status" style="font-size:13px;margin-top:10px;min-height:16px;"></div>
+</div>
+
+<!-- Main social tabs -->
+<div class="social-tabs mb-20">
+  <button class="social-tab active" onclick="switchTab('create', this)">Create Post</button>
+  <button class="social-tab" onclick="switchTab('ai-generate', this)">AI Generate Posts</button>
+  <button class="social-tab" onclick="switchTab('find-clients', this)">Find Clients</button>
+  <button class="social-tab" onclick="switchTab('reply-templates', this)">Reply Templates</button>
+  <button class="social-tab" onclick="switchTab('schedule', this)">Post Schedule</button>
+</div>
+
+<!-- CREATE POST -->
+<div class="social-panel" id="panel-create">
+  <div class="card">
+    <div class="card-title mb-4">Create Facebook Post</div>
+    <div class="card-subtitle mb-20">Write and publish directly to your Facebook Page</div>
+    <div class="form-group">
+      <label class="form-label">Post Content</label>
+      <textarea id="post-content" class="form-input" rows="5" style="resize:vertical;"
+                placeholder="Write your post here… (you can also use AI Generate to create posts automatically)"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:11.5px;color:var(--text-muted);flex:1;" id="post-char-count">0 / 63,206 characters</span>
+      <button class="btn btn-ghost btn-sm" onclick="FB_Mgr.aiRefine()">AI Refine</button>
+      <button class="btn btn-ghost btn-sm" onclick="FB_Mgr.addEmoji()">+ Emoji</button>
+      <button class="btn btn-ghost btn-sm" onclick="FB_Mgr.addHashtags()">+ Hashtags</button>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="FB_Mgr.postNow()" id="post-now-btn" style="font-weight:700;">Publish Now</button>
+      <button class="btn btn-ghost" onclick="FB_Mgr.preview()">Preview</button>
+    </div>
+    <div id="post-status" style="font-size:13px;margin-top:12px;min-height:18px;"></div>
+  </div>
+</div>
+
+<!-- AI GENERATE POSTS -->
+<div class="social-panel" id="panel-ai-generate" style="display:none;">
+  <div class="card">
+    <div class="card-title mb-4">AI Post Generator</div>
+    <div class="card-subtitle mb-20">NEXUS generates high-converting posts for your business</div>
+    <div class="form-group">
+      <label class="form-label">What to post about</label>
+      <input type="text" id="gen-topic" class="form-input" placeholder="e.g. new app launch, client success story, special offer, behind the scenes…">
+    </div>
+    <div class="form-row" style="margin-top:14px;">
+      <div class="form-group">
+        <label class="form-label">Post Type</label>
+        <select id="gen-type" class="form-select">
+          <option value="promotional">Promotional / Offer</option>
+          <option value="educational">Educational / Value</option>
+          <option value="social_proof">Social Proof / Testimonial</option>
+          <option value="behind_scenes">Behind the Scenes</option>
+          <option value="question">Engagement Question</option>
+          <option value="announcement">Product Announcement</option>
+          <option value="client_attraction">Client Attraction</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tone</label>
+        <select id="gen-tone" class="form-select">
+          <option value="professional">Professional</option>
+          <option value="friendly">Friendly &amp; Casual</option>
+          <option value="excited">Excited &amp; Energetic</option>
+          <option value="authoritative">Authoritative &amp; Expert</option>
+          <option value="story">Story-driven</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-16" onclick="FB_Mgr.generatePost()" id="gen-btn" style="font-weight:700;">Generate Post</button>
+    <div id="gen-results" style="margin-top:20px;display:flex;flex-direction:column;gap:14px;"></div>
+  </div>
+</div>
+
+<!-- FIND CLIENTS -->
+<div class="social-panel" id="panel-find-clients" style="display:none;">
+  <div class="card">
+    <div class="card-title mb-4">Client Finder Strategy</div>
+    <div class="card-subtitle mb-20">AI-powered tactics to find and attract clients on Facebook</div>
+
+    <div class="form-group">
+      <label class="form-label">Your target client (describe in detail)</label>
+      <input type="text" id="client-target" class="form-input" placeholder="e.g. small restaurant owners in Johannesburg, freelancers aged 25-35, parents of primary school children…">
+    </div>
+    <button class="btn btn-primary mt-16" onclick="FB_Mgr.findClients()" id="clients-btn">Generate Client Strategy</button>
+
+    <div id="client-strategy" style="margin-top:24px;"></div>
+
+    <!-- Outreach message generator -->
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--card-border);">
+      <div class="card-title mb-4" style="font-size:14px;">Outreach Message Generator</div>
+      <div class="form-group">
+        <label class="form-label">Client name / context</label>
+        <input type="text" id="outreach-name" class="form-input" placeholder="e.g. John, who posted about needing a website…">
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Your offer</label>
+        <input type="text" id="outreach-offer" class="form-input" placeholder="e.g. build their business app at 50% off this month">
+      </div>
+      <button class="btn btn-primary mt-12" onclick="FB_Mgr.generateOutreach()" style="font-size:13px;">Generate Outreach Message</button>
+      <div id="outreach-result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- REPLY TEMPLATES -->
+<div class="social-panel" id="panel-reply-templates" style="display:none;">
+  <div class="card">
+    <div class="card-title mb-4">Reply Templates</div>
+    <div class="card-subtitle mb-20">Professional reply templates for comments, messages, and leads</div>
+    <div id="reply-templates-list" style="display:flex;flex-direction:column;gap:14px;"></div>
+  </div>
+</div>
+
+<!-- SCHEDULE -->
+<div class="social-panel" id="panel-schedule" style="display:none;">
+  <div class="card">
+    <div class="card-title mb-4">Content Calendar</div>
+    <div class="card-subtitle mb-20">Plan your posting schedule for maximum reach</div>
+    <div id="schedule-grid" style="display:flex;flex-direction:column;gap:12px;"></div>
+    <button class="btn btn-primary mt-16" onclick="FB_Mgr.generateSchedule()">Generate Weekly Content Plan</button>
+    <div id="schedule-result" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+<style>
+.social-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+.social-tab {
+  padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  color: var(--text-muted); cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.social-tab:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.social-tab.active { background: rgba(24,119,242,0.15); border-color: rgba(24,119,242,0.4); color: #4da6ff; }
+.social-panel { animation: fadeUp 0.2s ease; }
+.gen-post-card {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; padding: 18px; transition: border-color 0.2s;
+}
+.gen-post-card:hover { border-color: rgba(0,212,255,0.2); }
+.gen-post-text { font-size: 14px; color: var(--text); line-height: 1.7; white-space: pre-wrap; margin-bottom: 12px; }
+.strategy-section { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 18px; margin-bottom: 12px; }
+.strategy-title { font-size: 13px; font-weight: 700; color: var(--cyan); margin-bottom: 10px; }
+.strategy-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.strategy-list li { font-size: 13px; color: var(--text-mid); line-height: 1.6; padding-left: 18px; position: relative; }
+.strategy-list li::before { content: '→'; position: absolute; left: 0; color: var(--cyan); }
+.template-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 18px; }
+.template-category { font-size: 10px; font-weight: 800; color: var(--cyan); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.template-text { font-size: 13.5px; color: var(--text); line-height: 1.65; margin-bottom: 12px; font-style: italic; }
+.post-preview {
+  background: #1877f2; border-radius: 12px; padding: 20px; max-width: 480px;
+  font-family: 'Helvetica Neue', sans-serif;
+}
+.post-preview-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.post-preview-avatar { width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:16px; }
+.post-preview-name { font-size:14px;font-weight:700;color:#fff; }
+.post-preview-time { font-size:11px;color:rgba(255,255,255,0.6); }
+.post-preview-text { font-size:14px;color:#fff;line-height:1.6; }
+</style>
+
+<script>
+const OWNER_NAME = "{{ owner.get('full_name', 'Founder') }}";
+const COMPANY    = "{{ owner.get('company', 'NEXUS') }}";
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.social-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.social-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById('panel-' + tab).style.display = 'block';
+}
+
+// Load reply templates on DOM ready
+function loadReplyTemplates() {
+  const templates = [
+    { category: "New Comment / Enquiry", text: `Hi [Name]! 👋 Thank you for reaching out. I'd love to help you with [problem]. Could I ask — what's your biggest challenge with [topic] right now?` },
+    { category: "Interested Lead", text: `Hey [Name], great to hear from you! I can absolutely help with that. I actually built [App/Solution] specifically for this problem. Want me to show you how it works in a quick 5-minute demo? No obligations! 😊` },
+    { category: "Positive Review / Thank You", text: `Thank you so much, [Name]! 🙏 We're really glad [App] is making a difference for you. If you know anyone else who could benefit, a quick referral means the world to us! ❤️` },
+    { category: "Complaint / Problem", text: `Hi [Name], I sincerely apologise for this experience — this is not the standard we hold ourselves to. I'm personally going to look into this right now. Can you DM me your account details so I can resolve this immediately?` },
+    { category: "Price Enquiry", text: `Hi [Name]! Our pricing is designed to grow with you: we offer a free trial with no credit card needed, and paid plans start from [price]. Most users recover the cost within the first month. Want me to send you the full pricing breakdown?` },
+    { category: "Facebook Group Response (Client Finding)", text: `Hi [Name] — saw your post about [problem]. We actually built something that solves exactly this. [Company] is helping [X] businesses in [location] do [outcome]. I'd love to show you, no pitch, just a quick demo. Interested?` },
+    { category: "Post-Demo Follow Up", text: `Hey [Name]! Just following up on our chat yesterday. Did you get a chance to think about what we discussed? Happy to answer any questions — even a quick voice note works if that's easier! 😊` },
+  ];
+  const container = document.getElementById('reply-templates-list');
+  container.innerHTML = templates.map(t => `
+    <div class="template-card">
+      <div class="template-category">${t.category}</div>
+      <div class="template-text">"${t.text}"</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="copyTemplate(this, \`${t.text.replace(/`/g,'\\`')}\`)">Copy</button>
+        <button class="btn btn-ghost btn-sm" onclick="useInPost(\`${t.text.replace(/`/g,'\\`')}\`)">Use in Post</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyTemplate(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+function useInPost(text) {
+  switchTab('create', document.querySelector('.social-tab'));
+  document.getElementById('post-content').value = text;
+}
+
+const FB_Mgr = {
+  token: localStorage.getItem('fb_token') || '',
+  pageId: localStorage.getItem('fb_page_id') || '',
+
+  connect() {
+    const tok = document.getElementById('fb-token').value.trim();
+    const pid = document.getElementById('fb-page-id').value.trim();
+    const st  = document.getElementById('fb-connect-status');
+    if (!tok) { st.style.color='var(--red)'; st.textContent='⚠ Please paste your Page Access Token.'; return; }
+    st.style.color='var(--cyan)'; st.textContent='Verifying token…';
+    fetch('/api/social/connect', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token:tok, page_id:pid}) })
+      .then(r => r.json()).then(d => {
+        if (d.success) {
+          this.token  = tok;
+          this.pageId = pid || d.page_id || '';
+          localStorage.setItem('fb_token', tok);
+          if (this.pageId) localStorage.setItem('fb_page_id', this.pageId);
+          document.getElementById('fb-status-badge').style.cssText = 'padding:8px 16px;font-size:13px;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.4);color:#4da6ff;border-radius:99px;';
+          document.getElementById('fb-status-badge').textContent = '● Facebook Connected';
+          st.style.color='var(--green)'; st.textContent = '✓ Connected to Facebook Page successfully!';
+          document.getElementById('fb-connect-card').style.borderColor='rgba(24,119,242,0.4)';
+        } else {
+          st.style.color='var(--red)'; st.textContent='⚠ ' + (d.error || 'Invalid token. Please check and try again.');
+        }
+      }).catch(() => { st.style.color='var(--red)'; st.textContent='⚠ Network error.'; });
+  },
+
+  postNow() {
+    const content = document.getElementById('post-content').value.trim();
+    const st = document.getElementById('post-status');
+    if (!content) { st.style.color='var(--red)'; st.textContent='⚠ Write something first!'; return; }
+    if (!this.token) { st.style.color='var(--red)'; st.textContent='⚠ Connect Facebook first (top of page).'; return; }
+    const btn = document.getElementById('post-now-btn');
+    btn.disabled = true; btn.textContent = 'Publishing…';
+    st.style.color = 'var(--cyan)'; st.textContent = 'Publishing to Facebook…';
+    fetch('/api/social/post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content, token: this.token, page_id: this.pageId}) })
+      .then(r => r.json()).then(d => {
+        if (d.success) {
+          st.style.color='var(--green)'; st.textContent = '✓ Post published! Post ID: ' + (d.post_id || 'unknown');
+          document.getElementById('post-content').value = '';
+        } else {
+          st.style.color='var(--red)'; st.textContent='⚠ ' + (d.error || 'Failed to publish. Check your token and page ID.');
+        }
+        btn.disabled = false; btn.textContent = 'Publish Now';
+      }).catch(() => { st.style.color='var(--red)'; st.textContent='⚠ Network error.'; btn.disabled=false; btn.textContent='Publish Now'; });
+  },
+
+  async generatePost() {
+    const topic = document.getElementById('gen-topic').value.trim();
+    const type  = document.getElementById('gen-type').value;
+    const tone  = document.getElementById('gen-tone').value;
+    const btn   = document.getElementById('gen-btn');
+    if (!topic) return;
+    btn.disabled = true; btn.textContent = 'Generating…';
+    const res  = await fetch('/api/social/generate-post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({topic, type, tone, company: COMPANY}) });
+    const data = await res.json();
+    const cont = document.getElementById('gen-results');
+    cont.innerHTML = (data.posts || []).map((p, i) => `
+      <div class="gen-post-card">
+        <div style="font-size:10px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Option ${i+1}</div>
+        <div class="gen-post-text">${escHtml(p)}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('post-content').value=\`${p.replace(/`/g,'\\`')}\`; switchTab('create', document.querySelectorAll('.social-tab')[0])">Use This</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyText(\`${p.replace(/`/g,'\\`')}\`, this)">Copy</button>
+        </div>
+      </div>
+    `).join('');
+    btn.disabled = false; btn.textContent = 'Generate Post';
+  },
+
+  async findClients() {
+    const target = document.getElementById('client-target').value.trim();
+    const btn    = document.getElementById('clients-btn');
+    if (!target) return;
+    btn.disabled = true; btn.textContent = 'Generating…';
+    const res  = await fetch('/api/social/find-clients', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({target, company: COMPANY}) });
+    const data = await res.json();
+    const cont = document.getElementById('client-strategy');
+    cont.innerHTML = (data.sections || []).map(s => `
+      <div class="strategy-section">
+        <div class="strategy-title">${escHtml(s.title)}</div>
+        <ul class="strategy-list">${(s.points || []).map(p => `<li>${escHtml(p)}</li>`).join('')}</ul>
+      </div>
+    `).join('');
+    btn.disabled = false; btn.textContent = 'Generate Client Strategy';
+  },
+
+  async generateOutreach() {
+    const name  = document.getElementById('outreach-name').value.trim();
+    const offer = document.getElementById('outreach-offer').value.trim();
+    if (!name || !offer) return;
+    const res  = await fetch('/api/social/outreach', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, offer, company: COMPANY}) });
+    const data = await res.json();
+    const cont = document.getElementById('outreach-result');
+    cont.innerHTML = `
+      <div class="gen-post-card">
+        <div style="font-size:10px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Outreach Message</div>
+        <div class="gen-post-text">${escHtml(data.message || '')}</div>
+        <button class="btn btn-ghost btn-sm" onclick="copyText(\`${(data.message||'').replace(/`/g,'\\`')}\`, this)">Copy</button>
+      </div>`;
+  },
+
+  async generateSchedule() {
+    const res  = await fetch('/api/social/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({company: COMPANY}) });
+    const data = await res.json();
+    const cont = document.getElementById('schedule-result');
+    cont.innerHTML = (data.days || []).map(d => `
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px 18px;">
+        <div style="font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:6px;">${escHtml(d.day)}</div>
+        <div style="font-size:13px;color:var(--text-mid);">${escHtml(d.suggestion)}</div>
+      </div>
+    `).join('');
+  },
+
+  preview() {
+    const content = document.getElementById('post-content').value.trim();
+    if (!content) return;
+    const initials = (COMPANY || OWNER_NAME || 'N').charAt(0).toUpperCase();
+    alert(`Facebook Post Preview:\n\n${content}\n\n(This is how it will look on your Facebook Page)`);
+  },
+
+  aiRefine() {
+    const ta = document.getElementById('post-content');
+    if (!ta.value.trim()) return;
+    document.getElementById('gen-topic').value = ta.value.trim();
+    switchTab('ai-generate', document.querySelectorAll('.social-tab')[1]);
+  },
+
+  addEmoji() {
+    const ta     = document.getElementById('post-content');
+    const emojis = ['🚀', '💡', '✅', '🔥', '💪', '🎯', '⚡', '🌟', '👇', '📲'];
+    ta.value += ' ' + emojis[Math.floor(Math.random() * emojis.length)];
+    ta.focus();
+  },
+
+  addHashtags() {
+    const ta = document.getElementById('post-content');
+    ta.value += '\n\n#NEXUS #AppDevelopment #TechStartup #SoftwareDevelopment #BuildWithAI #Innovation #Entrepreneur';
+    ta.focus();
+  },
+};
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadReplyTemplates();
+  // Update char count
+  document.getElementById('post-content').addEventListener('input', function() {
+    document.getElementById('post-char-count').textContent = this.value.length.toLocaleString() + ' / 63,206 characters';
+  });
+  // Restore token if saved
+  if (FB_Mgr.token) {
+    document.getElementById('fb-token').value = FB_Mgr.token;
+    document.getElementById('fb-status-badge').style.cssText = 'padding:8px 16px;font-size:13px;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.4);color:#4da6ff;border-radius:99px;';
+    document.getElementById('fb-status-badge').textContent = '● Facebook Connected';
+  }
+  if (FB_Mgr.pageId) document.getElementById('fb-page-id').value = FB_Mgr.pageId;
+});
+</script>
+{% endblock %}
