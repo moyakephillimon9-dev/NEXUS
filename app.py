@@ -1,3 +1,697 @@
+"""
+NEXUS — AI Operating System
+Web Application Entry Point
+
+Version : 0.1.0
+Owner   : Moyake Phillimon
+"""
+
+import os, json, threading, time, datetime, zipfile, io, ast, subprocess, sys
+from pathlib import Path
+from functools import wraps
+
+from flask import (Flask, render_template, request, session,
+                   redirect, url_for, jsonify, Response, send_file)
+
+from core.auth import Auth
+from core.owner_manager import OwnerManager
+from core.nexus_brain import NexusBrain
+from core.config import Config
+from core import sms_otp
+
+# ── App bootstrap ──────────────────────────────────────────────────────────────
+app = Flask(__name__)
+app.secret_key = os.environ.get('SESSION_SECRET', 'nexus-internal-key-change-me')
+
+auth     = Auth()
+owner_mgr = OwnerManager()
+brain    = NexusBrain()
+
+# task_id → progress dict (in-memory; survives the request lifecycle)
+active_builds: dict = {}
+
+
+# ── Auth decorator ─────────────────────────────────────────────────────────────
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('owner_id'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTH ROUTES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/')
+def index():
+    if not owner_mgr.has_owner():
+        return redirect(url_for('setup'))
+    if not session.get('owner_id'):
+        return redirect(url_for('login'))
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    if owner_mgr.has_owner():
+        return redirect(url_for('login'))
+    error = None
+    if request.method == 'POST':
+        d = request.form
+        pw  = d.get('password', '')
+        pw2 = d.get('password2', '')
+        if pw != pw2:
+            error = 'Passwords do not match.'
+        elif len(pw) < 8:
+            error = 'Password must be at least 8 characters.'
+        else:
+            result = owner_mgr.create_owner(
+                full_name = d.get('full_name', '').strip(),
+                email     = d.get('email', '').strip().lower(),
+                phone     = d.get('phone', '').strip(),
+                company   = d.get('company', '').strip(),
+                country   = d.get('country', '').strip(),
+                timezone  = d.get('timezone', 'UTC'),
+                password  = pw,
+            )
+            if result['success']:
+                session['owner_id']   = result['owner_id']
+                session['owner_name'] = result['name']
+                return redirect(url_for('dashboard'))
+            error = result.get('error', 'Setup failed.')
+    return render_template('setup.html', error=error)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if not owner_mgr.has_owner():
+        return redirect(url_for('setup'))
+    if session.get('owner_id'):
+        return redirect(url_for('dashboard'))
+    error = None
+    if request.method == 'POST':
+        result = auth.verify(
+            request.form.get('email', '').strip().lower(),
+            request.form.get('password', ''),
+        )
+        if result['success']:
+            session['owner_id']   = result['owner_id']
+            session['owner_name'] = result['name']
+            return redirect(url_for('dashboard'))
+        error = 'Invalid email or password.'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SMS / PHONE VERIFICATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/phone/send-otp', methods=['POST'])
+def api_phone_send_otp():
+    """Send a 6-digit OTP to the given phone number (no auth required — used at setup)."""
+    phone = (request.json or {}).get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'Phone number is required.'}), 400
+    result = sms_otp.send_otp(phone)
+    return jsonify(result)
+
+
+@app.route('/api/phone/verify-otp', methods=['POST'])
+def api_phone_verify_otp():
+    """Verify an OTP code against a phone number (no auth required — used at setup)."""
+    data  = request.json or {}
+    phone = data.get('phone', '').strip()
+    code  = data.get('code', '').strip()
+    if not phone or not code:
+        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
+    result = sms_otp.verify_otp(phone, code)
+    if result['success']:
+        # Store verified phone in session so setup form can confirm it
+        session['phone_verified'] = phone
+    return jsonify(result)
+
+
+@app.route('/api/phone/send-otp-auth', methods=['POST'])
+@login_required
+def api_phone_send_otp_auth():
+    """Send OTP to an authenticated owner's phone (from Settings)."""
+    phone = (request.json or {}).get('phone', '').strip()
+    if not phone:
+        owner = owner_mgr.get_owner()
+        phone = owner.get('phone', '')
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on file.'}), 400
+    result = sms_otp.send_otp(phone)
+    return jsonify(result)
+
+
+@app.route('/api/phone/verify-otp-auth', methods=['POST'])
+@login_required
+def api_phone_verify_otp_auth():
+    """Verify OTP and mark phone as verified on the owner profile."""
+    data  = request.json or {}
+    phone = data.get('phone', '').strip()
+    code  = data.get('code', '').strip()
+    if not phone or not code:
+        return jsonify({'success': False, 'error': 'Phone and code are required.'}), 400
+    result = sms_otp.verify_otp(phone, code)
+    if result['success']:
+        owner_mgr.update_owner({'phone': phone, 'phone_verified': True})
+    return jsonify(result)
+
+
+@app.route('/api/twilio/status')
+def api_twilio_status():
+    return jsonify({'configured': sms_otp.is_configured()})
+
+
+@app.route('/api/sms/test', methods=['POST'])
+@login_required
+def api_sms_test():
+    """Send a test SMS to the owner's registered phone."""
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on your profile. Add one in Settings first.'}), 400
+    if not sms_otp.is_configured():
+        return jsonify({'success': False, 'error': 'Twilio secrets not set. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in Replit Secrets.'}), 400
+    result = _send_alert_sms(phone, f"✅ NEXUS SMS Test — your alerts are working! System is online.")
+    return jsonify(result)
+
+
+@app.route('/api/sms/alert', methods=['POST'])
+@login_required
+def api_sms_alert():
+    """Send a manual SMS alert with a custom message."""
+    data    = request.json or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'success': False, 'error': 'Message is required.'}), 400
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '').strip()
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number on your profile.'}), 400
+    result = _send_alert_sms(phone, message)
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN DASHBOARD
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    owner    = owner_mgr.get_owner()
+    projects = _load_projects()[:6]
+    workers  = brain.get_workers_summary()
+    stats    = {
+        'total_projects' : len(_load_projects()),
+        'workers_online' : len([w for w in workers if w.get('status') == 'online']),
+        'memory_entries' : _count_memory_entries(),
+        'active_builds'  : len([b for b in active_builds.values() if b.get('status') == 'running']),
+    }
+    return render_template('dashboard.html', owner=owner, projects=projects,
+                           workers=workers, stats=stats)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHAT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/chat')
+@login_required
+def chat():
+    owner   = owner_mgr.get_owner()
+    history = brain.get_chat_history()
+    return render_template('chat.html', owner=owner, history=history)
+
+
+@app.route('/api/chat', methods=['POST'])
+@login_required
+def api_chat():
+    data       = request.json or {}
+    msg        = data.get('message', '').strip()
+    session_id = data.get('session_id')
+    if not msg:
+        return jsonify({'error': 'Empty message'}), 400
+    owner = owner_mgr.get_owner()
+    brain.save_message('user', msg, session_id)
+    response = brain.respond(msg, owner, session_id)
+    brain.save_message('nexus', response, session_id)
+    return jsonify({'response': response})
+
+
+@app.route('/api/chat/stream')
+@login_required
+def api_chat_stream():
+    msg        = request.args.get('message', '').strip()
+    session_id = request.args.get('session_id') or None
+    owner      = owner_mgr.get_owner()
+
+    def generate():
+        brain.save_message('user', msg, session_id)
+        full   = ''
+        intent = brain.detect_intent(msg, owner)
+        for token in brain.stream_response(msg, owner, session_id):
+            full += token
+            yield f"data: {json.dumps({'token': token})}\n\n"
+        brain.save_message('nexus', full, session_id)
+        yield f"data: {json.dumps({'done': True, 'intent': intent})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@app.route('/api/chat/clear', methods=['POST'])
+@login_required
+def api_chat_clear():
+    brain.clear_chat_history()
+    return jsonify({'success': True})
+
+
+# ── Chat Sessions ─────────────────────────────────────────────────────────────
+
+@app.route('/api/chat/sessions', methods=['GET'])
+@login_required
+def api_chat_sessions_list():
+    return jsonify({'sessions': brain.list_sessions()})
+
+
+@app.route('/api/chat/sessions', methods=['POST'])
+@login_required
+def api_chat_sessions_create():
+    data = request.json or {}
+    sess = brain.create_session(data.get('name', 'New Chat'))
+    return jsonify({'session': {'id': sess['id'], 'name': sess['name']}})
+
+
+@app.route('/api/chat/sessions/<session_id>', methods=['DELETE'])
+@login_required
+def api_chat_sessions_delete(session_id):
+    brain.delete_session(session_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/chat/sessions/<session_id>/rename', methods=['POST'])
+@login_required
+def api_chat_sessions_rename(session_id):
+    name = (request.json or {}).get('name', '')
+    brain.rename_session(session_id, name)
+    return jsonify({'success': True})
+
+
+@app.route('/api/chat/sessions/<session_id>/messages', methods=['GET'])
+@login_required
+def api_chat_sessions_messages(session_id):
+    return jsonify({'messages': brain.get_chat_history(session_id)})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROJECTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/projects')
+@login_required
+def projects():
+    owner    = owner_mgr.get_owner()
+    all_proj = _load_projects()
+    return render_template('projects.html', owner=owner, projects=all_proj)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BUILDER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/builder')
+@login_required
+def builder():
+    owner = owner_mgr.get_owner()
+    return render_template('builder.html', owner=owner)
+
+
+@app.route('/api/build', methods=['POST'])
+@login_required
+def api_build():
+    data = request.json or {}
+    goal = data.get('goal', '').strip()
+    if not goal:
+        return jsonify({'error': 'Goal is required'}), 400
+
+    task_id = f"task_{int(time.time() * 1000)}"
+    active_builds[task_id] = {
+        'goal'      : goal,
+        'status'    : 'starting',
+        'progress'  : 0,
+        'stage'     : 'Initializing',
+        'stage_idx' : 0,
+        'logs'      : [f'[NEXUS] Received goal: {goal}'],
+        'started_at': datetime.datetime.now().isoformat(),
+        'result'    : None,
+    }
+
+    thread = threading.Thread(target=_run_pipeline, args=(task_id, goal), daemon=True)
+    thread.start()
+    return jsonify({'task_id': task_id})
+
+
+@app.route('/api/build/<task_id>/status')
+@login_required
+def api_build_status(task_id):
+    build = active_builds.get(task_id)
+    if not build:
+        return jsonify({'status': 'not_found'}), 404
+    return jsonify(build)
+
+
+@app.route('/api/build/<task_id>/files')
+@login_required
+def api_build_files(task_id):
+    """List files generated in the deployment folder for a completed build."""
+    build = active_builds.get(task_id)
+    if not build:
+        return jsonify({'error': 'Build not found'}), 404
+    deploy_path = build.get('deploy_path')
+    if not deploy_path or not Path(deploy_path).exists():
+        return jsonify({'files': [], 'deploy_path': deploy_path})
+
+    files = []
+    base = Path(deploy_path)
+    for fp in sorted(base.rglob('*')):
+        if fp.is_file():
+            rel = str(fp.relative_to(base))
+            size = fp.stat().st_size
+            files.append({'name': rel, 'size': size})
+    return jsonify({'files': files, 'deploy_path': str(base)})
+
+
+@app.route('/api/build/<task_id>/download')
+@login_required
+def api_build_download(task_id):
+    """Zip and serve the generated project as a downloadable archive."""
+    build = active_builds.get(task_id)
+    if not build:
+        return jsonify({'error': 'Build not found'}), 404
+    deploy_path = build.get('deploy_path')
+    if not deploy_path or not Path(deploy_path).exists():
+        return jsonify({'error': 'No deployment artefacts found — pipeline may have not completed.'}), 404
+
+    mem_zip = io.BytesIO()
+    base    = Path(deploy_path)
+    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fp in sorted(base.rglob('*')):
+            if fp.is_file():
+                zf.write(fp, fp.relative_to(base))
+    mem_zip.seek(0)
+
+    project_name = base.name.replace(' ', '_')
+    return send_file(
+        mem_zip,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f"{project_name}.zip",
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PUBLISH — App Store Publishing (founder-approval gated)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/publish')
+@login_required
+def publish():
+    owner    = owner_mgr.get_owner()
+    projects = _load_projects()
+    requests = _load_publish_requests()
+    return render_template('publish.html', owner=owner, projects=projects,
+                           pub_requests=requests)
+
+
+@app.route('/api/publish/request', methods=['POST'])
+@login_required
+def api_publish_request():
+    """Create a pending publish request — must be approved by founder before executing."""
+    data    = request.json or {}
+    goal    = data.get('goal', '').strip()
+    store   = data.get('store', '').strip()        # playstore | appstore | web
+    task_id = data.get('task_id', '').strip()
+    if not goal or not store:
+        return jsonify({'success': False, 'error': 'goal and store are required'}), 400
+
+    req_id  = f"pub_{int(time.time() * 1000)}"
+    pub_req = {
+        'id'          : req_id,
+        'task_id'     : task_id,
+        'goal'        : goal,
+        'store'       : store,
+        'status'      : 'pending',
+        'created_at'  : datetime.datetime.now().isoformat(),
+        'approved_at' : None,
+        'package_path': None,
+    }
+    requests = _load_publish_requests()
+    requests.append(pub_req)
+    _save_publish_requests(requests)
+
+    # SMS alert to founder
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    if phone:
+        _send_alert_sms(phone,
+            f"⚠️ NEXUS Publish Request\nNEXUS wants to publish '{goal[:60]}' to {store}.\n"
+            f"Log in → App Store Publish to approve or reject."
+        )
+    return jsonify({'success': True, 'request_id': req_id})
+
+
+@app.route('/api/publish/approve/<req_id>', methods=['POST'])
+@login_required
+def api_publish_approve(req_id):
+    """Founder approves a publish request → NEXUS generates the store package."""
+    requests = _load_publish_requests()
+    req = next((r for r in requests if r['id'] == req_id), None)
+    if not req:
+        return jsonify({'success': False, 'error': 'Request not found'}), 404
+    if req['status'] != 'pending':
+        return jsonify({'success': False, 'error': f"Already {req['status']}"}), 400
+
+    req['status']      = 'approved'
+    req['approved_at'] = datetime.datetime.now().isoformat()
+
+    # Generate store package
+    package_path = _generate_store_package(req)
+    req['package_path'] = package_path
+    req['status']       = 'packaged'
+    _save_publish_requests(requests)
+
+    owner = owner_mgr.get_owner()
+    phone = owner.get('phone', '')
+    if phone:
+        _send_alert_sms(phone,
+            f"✅ NEXUS Published\n'{req['goal'][:60]}' store package ready → {package_path}"
+        )
+    return jsonify({'success': True, 'package_path': package_path})
+
+
+@app.route('/api/publish/reject/<req_id>', methods=['POST'])
+@login_required
+def api_publish_reject(req_id):
+    """Founder rejects a publish request."""
+    requests = _load_publish_requests()
+    req = next((r for r in requests if r['id'] == req_id), None)
+    if not req:
+        return jsonify({'success': False, 'error': 'Request not found'}), 404
+    req['status']      = 'rejected'
+    req['rejected_at'] = datetime.datetime.now().isoformat()
+    _save_publish_requests(requests)
+    return jsonify({'success': True})
+
+
+@app.route('/api/publish/<req_id>/download')
+@login_required
+def api_publish_download(req_id):
+    """Zip and serve a store package."""
+    requests = _load_publish_requests()
+    req      = next((r for r in requests if r['id'] == req_id), None)
+    if not req or not req.get('package_path'):
+        return jsonify({'error': 'Package not found'}), 404
+    base = Path(req['package_path'])
+    if not base.exists():
+        return jsonify({'error': 'Package folder missing'}), 404
+    mem_zip = io.BytesIO()
+    with zipfile.ZipFile(mem_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fp in sorted(base.rglob('*')):
+            if fp.is_file():
+                zf.write(fp, fp.relative_to(base))
+    mem_zip.seek(0)
+    return send_file(mem_zip, mimetype='application/zip', as_attachment=True,
+                     download_name=f"{base.name}.zip")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROMOTE — Social Media & Google Ads
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROFIT FINDER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/profit')
+@login_required
+def profit():
+    from core.nexus_brain import PROFIT_IDEAS
+    owner = owner_mgr.get_owner()
+    return render_template('profit.html', owner=owner, ideas=PROFIT_IDEAS)
+
+
+@app.route('/api/profit/search', methods=['POST'])
+@login_required
+def api_profit_search():
+    query = (request.json or {}).get('query', '').strip()
+    ideas = brain.find_profit_ideas(query)
+    return jsonify({'ideas': ideas})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SOCIAL MEDIA MANAGER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/social')
+@login_required
+def social():
+    owner = owner_mgr.get_owner()
+    return render_template('social.html', owner=owner)
+
+
+@app.route('/api/social/connect', methods=['POST'])
+@login_required
+def api_social_connect():
+    """Verify a Facebook Page Access Token."""
+    import urllib.request, urllib.parse
+    data    = request.json or {}
+    token   = data.get('token', '').strip()
+    page_id = data.get('page_id', '').strip()
+    if not token:
+        return jsonify({'success': False, 'error': 'Token is required'})
+    try:
+        url  = f"https://graph.facebook.com/me?fields=id,name&access_token={urllib.parse.quote(token)}"
+        req  = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            fb_data = json.loads(resp.read())
+        if 'error' in fb_data:
+            return jsonify({'success': False, 'error': fb_data['error'].get('message', 'Invalid token')})
+        # Never persist the access token in project JSON. It is accepted only
+        # for this verification request; production use should come from a
+        # Replit secret such as FB_PAGE_TOKEN.
+        settings = _load_nexus_settings()
+        if page_id:
+            settings['fb_page_id'] = page_id
+        else:
+            settings['fb_page_id'] = fb_data.get('id', '')
+        _save_nexus_settings(settings)
+        return jsonify({'success': True, 'page_name': fb_data.get('name', ''), 'page_id': settings['fb_page_id']})
+    except Exception as e:
+        detail = str(e)[:80]
+        return jsonify({'success': False, 'error': f'Could not verify token. Check it is a valid Page Access Token. ({detail})'})
+
+
+@app.route('/api/social/post', methods=['POST'])
+@login_required
+def api_social_post():
+    """Post to Facebook Page via Graph API."""
+    import urllib.request, urllib.parse
+    data    = request.json or {}
+    content = data.get('content', '').strip()
+    token   = data.get('token', '').strip()
+    page_id = data.get('page_id', '').strip()
+    if not content:
+        return jsonify({'success': False, 'error': 'Post content is required'})
+    if not token:
+        return jsonify({'success': False, 'error': 'Facebook token is required. Connect first.'})
+    if not page_id:
+        settings = _load_nexus_settings()
+        page_id  = settings.get('fb_page_id', '')
+    if not page_id:
+        return jsonify({'success': False, 'error': 'Page ID is required. Add it in the connect form.'})
+    try:
+        url      = f"https://graph.facebook.com/{urllib.parse.quote(page_id)}/feed"
+        post_data = urllib.parse.urlencode({'message': content, 'access_token': token}).encode()
+        req  = urllib.request.Request(url, data=post_data, method='POST')
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+        if 'error' in result:
+            return jsonify({'success': False, 'error': result['error'].get('message', 'Post failed')})
+        return jsonify({'success': True, 'post_id': result.get('id', 'unknown')})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Facebook API error: {str(e)[:100]}'})
+
+
+@app.route('/api/social/generate-post', methods=['POST'])
+@login_required
+def api_social_generate_post():
+    """AI-generate Facebook posts."""
+    data    = request.json or {}
+    topic   = data.get('topic', '')
+    ptype   = data.get('type', 'promotional')
+    tone    = data.get('tone', 'professional')
+    company = data.get('company', 'NEXUS')
+    owner   = owner_mgr.get_owner()
+    name    = (owner.get('full_name') or 'Founder').split()[0]
+
+    POST_TEMPLATES = {
+        'promotional': [
+            f"🚀 Big news from {company}!\n\nWe've just launched [{topic}] and it's changing the game for [target audience].\n\n✅ [Benefit 1]\n✅ [Benefit 2]\n✅ [Benefit 3]\n\n👇 Click the link to get started FREE today!\n\n#Entrepreneur #{company} #Innovation",
+            f"💡 Tired of [problem]?\n\n{company} built the solution: {topic}\n\nIn just [X minutes], you can [achieve outcome].\n\n🎯 No [barrier 1]. No [barrier 2]. Just results.\n\n→ Try it free: [link]\n\n#{company} #SoftwareSolution #SmallBusiness",
+        ],
+        'educational': [
+            f"📚 3 things most [target audience] don't know about {topic}:\n\n1️⃣ [Fact 1 — surprising, useful]\n2️⃣ [Fact 2 — actionable tip]\n3️⃣ [Fact 3 — game changer]\n\nSave this post and share it with someone who needs it! 🙏\n\n#{company} #BusinessTips #Entrepreneur",
+            f"🧠 The truth about {topic} (most people get this wrong):\n\n❌ Common mistake: [mistake]\n✅ What actually works: [solution]\n\nI've helped [X] businesses fix this. Here's exactly how:\n[3-step explanation]\n\nDM me if you want help with this. 👇\n\n#{company} #Expertise",
+        ],
+        'social_proof': [
+            f"⭐⭐⭐⭐⭐ Client story:\n\n[Client name] came to {company} struggling with {topic}.\n\nAfter working with us, they [achieved specific result] in just [timeframe].\n\n'[Short testimonial quote]' — [Client]\n\nReady for your own success story? DM us today! 📲\n\n#{company} #ClientResults #Testimonial",
+        ],
+        'behind_scenes': [
+            f"👀 Behind the scenes at {company}:\n\nRight now our team is working on {topic}.\n\nHere's what goes into building something that actually works:\n\n🔧 [Step 1]\n⚡ [Step 2]\n✅ [Step 3]\n\nThe details most people skip are what separate good from great. 💪\n\n#{company} #BuildInPublic #Startup",
+        ],
+        'question': [
+            f"Quick question for [target audience]:\n\nWhat's your BIGGEST challenge with {topic} right now?\n\nA) [Option 1]\nB) [Option 2]\nC) [Option 3]\nD) Something else (comment below! 👇)\n\nWe're building solutions to the most common answers. Your feedback shapes what we build next!\n\n#{company} #CommunityQuestion",
+        ],
+        'announcement': [
+            f"🎉 WE'RE LIVE!\n\n{company} is proud to announce: {topic}\n\nBuilt specifically for [target audience] who are serious about [goal].\n\n🔑 Key features:\n→ [Feature 1]\n→ [Feature 2]\n→ [Feature 3]\n\n🎁 LAUNCH OFFER: First [X] users get [special deal].\n\nLink in bio | DM us | Share with someone who needs this! 🙏\n\n#{company} #Launch #NewProduct",
+        ],
+        'client_attraction': [
+            f"Are you a [target client] struggling with {topic}?\n\n{company} specialises in solving exactly this — and we have [X spots] available this month.\n\nWhat we offer:\n✅ [Value prop 1]\n✅ [Value prop 2]\n✅ [Value prop 3]\n\nNo contracts. No fluff. Just results.\n\nDM us 'YES' right now and let's talk. 👇\n\n#{company} #LookingForClients #Hiring",
+        ],
+    }
+    posts = POST_TEMPLATES.get(ptype, POST_TEMPLATES['promotional'])
+    return jsonify({'posts': posts})
+
+
+@app.route('/api/social/find-clients', methods=['POST'])
+@login_required
+def api_social_find_clients():
+    data    = request.json or {}
+    target  = data.get('target', 'small business owners')
+    company = data.get('company', 'NEXUS')
+    sections = [
+        {
+            "title": "📍 Where to Find Them on Facebook",
+            "points": [
+                f"Search Facebook Groups: '[target industry] owners', 'small business [city]', '[niche] entrepreneurs'",
+                f"Join 10-15 active groups with real engagement (posts getting comments, not just likes)",
+                f"Look for groups where people post problems — those are your leads",
+                f"Check local community groups — '[city] business network', '[city] entrepreneurs'",
+                f"Search for groups your {target} already uses (industry-specific)",
+            ]
         },
         {
             "title": "💬 How to Engage Without Being Spammy",
@@ -485,6 +1179,64 @@ def _wa(task_id: str, worker_name: str, worker_id: str,
     build.setdefault('worker_activity', []).append(entry)
 
 
+def _validate_generated_project(deploy_path: str) -> dict:
+    """Validate that a generated artifact is real, parseable, and runnable.
+
+    A deployment directory existing is not enough to call a build complete.
+    This gate intentionally rejects empty files, placeholder markers, Python
+    syntax errors, and projects whose advertised CLI cannot start.
+    """
+    base = Path(deploy_path)
+    main_file = base / 'main.py'
+    if not main_file.exists():
+        return {'passed': False, 'reason': 'Generated project has no main.py entry point.',
+                'suggestion': 'Regenerate the project with a supported Python application entry point.'}
+    source = main_file.read_text(encoding='utf-8', errors='replace')
+    if len(source.strip()) < 120:
+        return {'passed': False, 'reason': 'Generated main.py is empty or too small to be a working application.',
+                'suggestion': 'Describe the core workflow and required features in more detail, then rebuild.'}
+    try:
+        ast.parse(source, filename=str(main_file))
+    except SyntaxError as exc:
+        return {'passed': False, 'reason': f'Generated main.py has a syntax error: {exc.msg} on line {exc.lineno}.',
+                'suggestion': 'Regenerate the project; source was rejected before release.'}
+
+    placeholder_markers = (
+        'TODO', 'FIXME', 'Replace with actual', 'Replace:', 'not implemented',
+        'coming soon', 'your_api_key_here', 'pass  #'
+    )
+    lowered = source.lower()
+    marker = next((m for m in placeholder_markers if m.lower() in lowered), None)
+    if marker:
+        return {'passed': False, 'reason': f'Generated source contains a placeholder marker ({marker}).',
+                'suggestion': 'The source generator produced incomplete code. Rebuild after refining the goal.'}
+
+    requirements = base / 'requirements.txt'
+    if requirements.exists() and not requirements.read_text(encoding='utf-8', errors='replace').strip():
+        # An empty requirements file is valid for stdlib projects, so do not fail it.
+        pass
+
+    # The built-in generator promises a CLI. Exercise the real entry point,
+    # rather than trusting a generated status object.
+    try:
+        result = subprocess.run(
+            [sys.executable, str(main_file), '--help'],
+            cwd=str(base), capture_output=True, text=True, timeout=8,
+            env={**os.environ, 'PYTHONPATH': str(base)},
+        )
+    except subprocess.TimeoutExpired:
+        return {'passed': False, 'reason': 'Generated application did not respond to --help within 8 seconds.',
+                'suggestion': 'Check startup work and rebuild with a simpler first version.'}
+    except OSError as exc:
+        return {'passed': False, 'reason': f'Could not execute generated entry point: {exc}.',
+                'suggestion': 'Regenerate the project and ensure its runtime is supported.'}
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        return {'passed': False, 'reason': f'Generated application failed its startup check: {(detail[-1] if detail else "unknown error")[:240]}.',
+                'suggestion': 'Fix the runtime error shown in the build log before publishing.'}
+    return {'passed': True, 'reason': 'main.py compiled and responded to --help.', 'suggestion': ''}
+
+
 def _run_pipeline(task_id: str, goal: str):
     """
     Run the NEXUS pipeline in a background thread, updating active_builds.
@@ -512,24 +1264,12 @@ def _run_pipeline(task_id: str, goal: str):
         _wa(task_id, 'Manager AI', 'MGR-001',
             f'Received goal: "{goal[:100]}" — formulating execution plan', 'thinking')
 
-        # Stage-listing phase with worker activity messages
-        STAGE_CODES = {
-            'CODER-001':  'def main():\n    """Entry point."""\n    app = create_app()\n    app.run()',
-            'DB-001':     'CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  email TEXT NOT NULL\n);',
-            'ARCH-001':   '{\n  "pattern": "MVC",\n  "layers": 9,\n  "framework": "Flask"\n}',
-            'TEST-001':   'def test_create_user():\n    res = client.post("/users")\n    assert res.status == 201',
-            'SEC-001':    '# Security scan: checking for SQL injection,\n# XSS, hardcoded secrets, eval()…',
-            'DEPLOY-001': 'FROM python:3.12-slim\nCOPY . /app\nRUN pip install -r requirements.txt\nCMD ["python","main.py"]',
-            'DESIGN-001': ':root {\n  --primary: #00D4FF;\n  --bg: #07101A;\n  --radius: 14px;\n}',
-        }
         for idx, (wid, name, action) in enumerate(PIPELINE_STAGES):
             build['stage']     = f"Queuing: {name}"
             build['stage_idx'] = idx
             build['progress']  = 2 + int(((idx + 1) / len(PIPELINE_STAGES)) * 13)
             build['logs'].append(f"  [{wid:12s}] {action}")
-            msg_type = 'code' if wid in STAGE_CODES else 'thinking'
-            _wa(task_id, name, wid, action, msg_type,
-                code=STAGE_CODES.get(wid))
+            _wa(task_id, name, wid, action, 'thinking')
             time.sleep(0.08)
 
         build['stage']    = 'Executing Pipeline…'
@@ -588,6 +1328,19 @@ def _run_pipeline(task_id: str, goal: str):
             build['error']    = 'All stages ran but no deployment folder was created on disk.'
             build['logs'].append("[NEXUS] ✗ Deployment folder missing — build incomplete.")
             build['logs'].append("[NEXUS] ✗ No download generated.")
+            return
+
+        # ── Real artifact validation ─────────────────────────────────────
+        validation = _validate_generated_project(deploy_path)
+        build['logs'].append(f"[VERIFY] Runtime artifact check: {validation['reason']}")
+        if not validation['passed']:
+            build['status']   = 'error'
+            build['progress'] = 0
+            build['stage']    = '✗ Runtime Artifact Validation'
+            build['error']    = validation['reason']
+            if validation.get('suggestion'):
+                build['logs'].append(f"[NEXUS]   Fix     : {validation['suggestion']}")
+            build['logs'].append("[NEXUS] ✗ No download generated. Incomplete code was rejected.")
             return
 
         # ── Verification summary (already blocked in orchestrator if failed) #

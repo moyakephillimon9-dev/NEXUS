@@ -373,124 +373,80 @@ Date : {ts}
 """
 
 import pytest
-import sys
-import os
+import importlib
+import inspect
 
 
-# ── Helpers ──────────────────────────────────────────────────────────
+def _service():
+    """Find the concrete generated service and use its public contract."""
+    mod = importlib.import_module("main")
+    services = [
+        obj for _, obj in inspect.getmembers(mod, inspect.isclass)
+        if _.endswith("Service") and obj.__module__ == mod.__name__
+    ]
+    assert services, "Generated project must expose a service class"
+    return services[0]()
 
-def _import_main():
-    """Attempt to import the generated application module."""
-    try:
-        import main
-        return main
-    except ImportError:
-        return None
-
-
-# ── Import & Startup Tests ────────────────────────────────────────────
 
 def test_main_module_importable():
-    """The generated main.py must be importable without side-effects."""
-    mod = _import_main()
-    if mod is None:
-        pytest.skip("main.py not present in test context")
-    assert mod is not None
+    """The real generated entry module imports successfully."""
+    assert importlib.import_module("main") is not None
 
 
-def test_no_syntax_errors():
-    """Verify main.py has valid Python syntax."""
-    main_path = os.path.join(os.path.dirname(__file__), "..", "main.py")
-    if not os.path.exists(main_path):
-        pytest.skip("main.py not found")
-    import ast
-    with open(main_path, encoding="utf-8") as fh:
-        source = fh.read()
-    tree = ast.parse(source)   # raises SyntaxError if invalid
-    assert tree is not None
+def test_create_and_read_round_trip():
+    """A record can be created and read back through the public service."""
+    service = _service()
+    created = service.create("NEXUS test record", "verified value")
+    fetched = service.get(created.id)
+    assert fetched.name == "NEXUS test record"
+    assert fetched.value == "verified value"
 
 
-# ── Core Functionality Tests ──────────────────────────────────────────
-
-def test_core_business_logic():
-    """Core logic returns expected results for valid input."""
-    # Replace with actual calls to your service/domain classes
-    assert True
-
-
-def test_input_validation_rejects_empty():
-    """Empty or None inputs should raise ValueError, not crash."""
-    mod = _import_main()
-    if mod is None:
-        pytest.skip("main.py not present")
-    # Example: assert raises ValueError for empty name
-    # service = mod.{ptype.title().replace("_", "")}Service()
-    # with pytest.raises(ValueError):
-    #     service.create("")
-    assert True
+def test_list_and_search_return_created_record():
+    """The generated persistence and search paths return real data."""
+    service = _service()
+    created = service.create("Searchable record", "unique search value")
+    assert any(item.id == created.id for item in service.list_all())
+    assert any(item.id == created.id for item in service.search("unique search"))
 
 
-def test_input_validation_rejects_none():
-    """None inputs must be handled gracefully."""
-    try:
-        result = None  # Replace with actual call
-        assert result is None or True
-    except (ValueError, TypeError):
-        pass  # Expected
+def test_empty_name_is_rejected():
+    """Invalid user input is rejected by the generated business layer."""
+    service = _service()
+    with pytest.raises(ValueError):
+        service.create("")
 
 
-# ── Boundary & Edge Cases ─────────────────────────────────────────────
-
-def test_boundary_maximum_input():
-    """Very large inputs should not crash the application."""
-    big_string = "x" * 10_000
-    try:
-        pass  # Replace: service.process(big_string)
-    except (ValueError, OverflowError):
-        pass  # Acceptable rejection
+def test_missing_record_is_rejected():
+    """Missing records produce a controlled error rather than fake success."""
+    service = _service()
+    with pytest.raises(ValueError):
+        service.get(999999999)
 
 
-def test_boundary_minimum_input():
-    """Single-character or minimal inputs should behave predictably."""
-    try:
-        pass  # Replace: service.process("a")
-    except ValueError:
-        pass
+def test_update_changes_persisted_value():
+    """Updates are persisted and visible on the next read."""
+    service = _service()
+    created = service.create("Update record", "before")
+    updated = service.update(created.id, "after")
+    assert updated.value == "after"
+    assert service.get(created.id).value == "after"
 
 
-# ── Persistence Tests ─────────────────────────────────────────────────
-
-def test_data_persists_after_write(tmp_path):
-    """Written data can be read back correctly."""
-    db_file = tmp_path / "test.db"
-    # Replace with your Database class
-    assert not db_file.exists() or db_file.stat().st_size >= 0
-
-
-# ── Error Handling Tests ──────────────────────────────────────────────
-
-def test_handles_missing_resource_gracefully():
-    """Requesting a non-existent resource returns None or raises ValueError."""
-    mod = _import_main()
-    if mod is None:
-        pytest.skip("main.py not present")
-    # Example:
-    # service = mod.SomeService()
-    # result = service.get(99999)
-    # assert result is None
-    assert True
+def test_remove_deletes_record():
+    """Delete returns true for a real record and the record is gone."""
+    service = _service()
+    created = service.create("Delete record", "temporary")
+    assert service.remove(created.id) is True
+    with pytest.raises(ValueError):
+        service.get(created.id)
 
 
-def test_no_unhandled_exceptions_on_bad_input():
-    """The application must never propagate unhandled exceptions to the user."""
-    bad_inputs = [None, "", -1, [], {{}}, "'; DROP TABLE records; --"]
-    for inp in bad_inputs:
-        try:
-            pass  # Replace: service.process(inp)
-        except (ValueError, TypeError, AttributeError):
-            pass  # These are fine — controlled failures
-        except Exception as exc:
-            pytest.fail(f"Unhandled {{type(exc).__name__}} for input {{inp!r}}: {{exc}}")
+def test_large_value_is_handled():
+    """The service handles a realistic large value without crashing."""
+    service = _service()
+    created = service.create("Large record", "x" * 10000)
+    assert len(service.get(created.id).value) == 10000
 '''
 
     # ·· Docs ·························································· #
@@ -768,14 +724,14 @@ class CLI:
                 case "create":
                     rec = self._svc.create(args.name,
                                            getattr(args, "value", ""))
-                    print(f"✓  Created  #{rec.id}: {{rec.name}}")
+                    print(f"✓  Created  #{{rec.id}}: {{rec.name}}")
 
                 case "list":
                     recs = self._svc.list_all()
                     if not recs:
                         print("  (no records)")
                     else:
-                        print(f"  {{len(recs)}} record(s):\n")
+                        print(f"  {{len(recs)}} record(s):\\n")
                         for r in recs:
                             print(f"  {{r.id:>4}}  {{r.name:<30}}  {{r.value[:45]}}")
 
@@ -786,7 +742,7 @@ class CLI:
 
                 case "update":
                     r = self._svc.update(args.id, args.value)
-                    print(f"✓  Updated  #{r.id}: {{r.name}}")
+                    print(f"✓  Updated  #{{r.id}}: {{r.name}}")
 
                 case "delete":
                     ok = self._svc.remove(args.id)
